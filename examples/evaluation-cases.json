@@ -1,0 +1,14 @@
+[
+  {
+    "id": "example-01",
+    "jd": "Backend Engineer\nRequired: TypeScript and API design. Bonus: Kubernetes.",
+    "company_url": "http://localhost:8099/acme/",
+    "days": 5
+  },
+  {
+    "id": "example-02",
+    "jd": "Engineer wanted. Please contact us for details.",
+    "company_url": "https://example.com/",
+    "days": 60
+  }
+]

@@ -15,10 +15,14 @@
     "build": "npm run build --workspace=@jobber/core && npm run build --workspace=@jobber/web",
     "start": "npm run start --workspace=@jobber/web",
     "lint": "eslint .",
-    "typecheck": "npm run build --workspace=@jobber/core && npm run typecheck --workspaces --if-present",
-    "test": "npm run test --workspace=@jobber/core",
+    "typecheck": "npm run build --workspace=@jobber/core && npm run typecheck --workspaces --if-present && tsc -p tsconfig.scripts.json --noEmit",
+    "test": "npm run test --workspace=@jobber/core && npm run test:cli",
     "check": "npm run lint && npm run typecheck && npm test",
-    "predev": "npm run build --workspace=@jobber/core"
+    "predev": "npm run build --workspace=@jobber/core",
+    "build:cli": "npm run build --workspace=@jobber/core && tsc -p tsconfig.scripts.json",
+    "preevaluate": "npm run build:cli",
+    "evaluate": "node dist/scripts/evaluate.mjs",
+    "test:cli": "npm run build:cli && node --test scripts/tests/*.test.mjs"
   },
   "devDependencies": {
     "@types/node": "22.15.30",
