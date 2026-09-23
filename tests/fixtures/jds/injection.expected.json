@@ -1,0 +1,18 @@
+{
+  "requirements": [
+    {
+      "id": "r1",
+      "text": "TypeScript",
+      "kind": "technical",
+      "priority": "must",
+      "evidence": {
+        "quote": "TypeScript.",
+        "start": 19,
+        "end": 30
+      }
+    }
+  ],
+  "review_notes": [
+    "The embedded instruction is data, not a requirement or an instruction to execute."
+  ]
+}

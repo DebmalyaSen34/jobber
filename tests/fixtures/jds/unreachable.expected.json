@@ -1,0 +1,18 @@
+{
+  "requirements": [
+    {
+      "id": "r1",
+      "text": "SQL query optimization",
+      "kind": "technical",
+      "priority": "must",
+      "evidence": {
+        "quote": "SQL query optimization",
+        "start": 27,
+        "end": 49
+      }
+    }
+  ],
+  "review_notes": [
+    "Failed company retrieval does not remove the stated SQL requirement."
+  ]
+}

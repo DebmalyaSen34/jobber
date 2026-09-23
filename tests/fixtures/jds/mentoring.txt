@@ -1,0 +1,5 @@
+Engineering Lead
+You will mentor junior engineers and resolve disagreements constructively.
+Required: experience designing reliable distributed systems.
+Preferred: experience in healthcare.
+Degree or equivalent practical experience required.

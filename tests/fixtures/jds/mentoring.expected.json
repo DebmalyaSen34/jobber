@@ -1,0 +1,62 @@
+{
+  "requirements": [
+    {
+      "id": "r1",
+      "text": "Mentor junior engineers",
+      "kind": "behavioural",
+      "priority": "must",
+      "evidence": {
+        "quote": "mentor junior engineers",
+        "start": 26,
+        "end": 49
+      }
+    },
+    {
+      "id": "r2",
+      "text": "Resolve disagreements constructively",
+      "kind": "behavioural",
+      "priority": "must",
+      "evidence": {
+        "quote": "resolve disagreements constructively",
+        "start": 54,
+        "end": 90
+      }
+    },
+    {
+      "id": "r3",
+      "text": "Experience designing reliable distributed systems",
+      "kind": "technical",
+      "priority": "must",
+      "evidence": {
+        "quote": "experience designing reliable distributed systems",
+        "start": 102,
+        "end": 151
+      }
+    },
+    {
+      "id": "r4",
+      "text": "Experience in healthcare",
+      "kind": "domain",
+      "priority": "nice",
+      "evidence": {
+        "quote": "experience in healthcare",
+        "start": 164,
+        "end": 188
+      }
+    },
+    {
+      "id": "r5",
+      "text": "Degree or equivalent practical experience",
+      "kind": "domain",
+      "priority": "must",
+      "evidence": {
+        "quote": "Degree or equivalent practical experience",
+        "start": 190,
+        "end": 231
+      }
+    }
+  ],
+  "review_notes": [
+    "A degree alone must not be mandatory; equivalent experience is accepted."
+  ]
+}

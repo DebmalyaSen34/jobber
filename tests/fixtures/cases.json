@@ -1,0 +1,44 @@
+[
+  {
+    "id": "backend",
+    "jd_file": "jds/backend.txt",
+    "expected_file": "jds/backend.expected.json",
+    "company_path": "/acme/",
+    "days": 5
+  },
+  {
+    "id": "mentoring",
+    "jd_file": "jds/mentoring.txt",
+    "expected_file": "jds/mentoring.expected.json",
+    "company_path": "/no-hiring/",
+    "days": 5
+  },
+  {
+    "id": "thin",
+    "jd_file": "jds/thin.txt",
+    "expected_file": "jds/thin.expected.json",
+    "company_path": "/no-hiring/",
+    "days": 60
+  },
+  {
+    "id": "no-hiring",
+    "jd_file": "jds/no-hiring.txt",
+    "expected_file": "jds/no-hiring.expected.json",
+    "company_path": "/no-hiring/",
+    "days": 1
+  },
+  {
+    "id": "unreachable",
+    "jd_file": "jds/unreachable.txt",
+    "expected_file": "jds/unreachable.expected.json",
+    "company_path": "/failures/missing",
+    "days": 5
+  },
+  {
+    "id": "injection",
+    "jd_file": "jds/injection.txt",
+    "expected_file": "jds/injection.expected.json",
+    "company_path": "/hostile/",
+    "days": 1
+  }
+]

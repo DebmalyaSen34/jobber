@@ -1,0 +1,18 @@
+{
+  "hiring_path": "/handbook/working-together/selection/",
+  "discovery_chain": [
+    "/acme/",
+    "/acme/people/",
+    "/handbook/working-together/selection/"
+  ],
+  "no_hiring_paths": [
+    "/no-hiring/",
+    "/no-hiring/product/"
+  ],
+  "blocked_prefix": "/blocked/",
+  "official_rounds": [
+    "take-home API exercise",
+    "system design interview",
+    "mentoring discussion"
+  ]
+}

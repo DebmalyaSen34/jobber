@@ -16,13 +16,16 @@
     "start": "npm run start --workspace=@jobber/web",
     "lint": "eslint .",
     "typecheck": "npm run build --workspace=@jobber/core && npm run typecheck --workspaces --if-present && tsc -p tsconfig.scripts.json --noEmit",
-    "test": "npm run test --workspace=@jobber/core && npm run test:cli",
+    "test": "npm run test --workspace=@jobber/core && npm run test:cli && npm run test:fixtures",
     "check": "npm run lint && npm run typecheck && npm test",
     "predev": "npm run build --workspace=@jobber/core",
     "build:cli": "npm run build --workspace=@jobber/core && tsc -p tsconfig.scripts.json",
     "preevaluate": "npm run build:cli",
     "evaluate": "node dist/scripts/evaluate.mjs",
-    "test:cli": "npm run build:cli && node --test scripts/tests/*.test.mjs"
+    "test:cli": "npm run build:cli && node --test scripts/tests/*.test.mjs",
+    "test:fixtures": "npm run build --workspace=@jobber/core && node --test tests/fixtures/*.test.mjs",
+    "fixtures:serve": "node tests/fixtures/serve.mjs",
+    "test:fixtures:http": "node --test tests/fixtures/http/*.test.mjs"
   },
   "devDependencies": {
     "@types/node": "22.15.30",

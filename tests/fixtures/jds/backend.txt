@@ -1,0 +1,9 @@
+Senior Backend Engineer
+Required qualifications:
+- 5+ years building APIs with TypeScript.
+- Experience with Python or Java.
+- Mentor junior engineers.
+Bonus points for:
+- Kubernetes experience.
+Our platform uses React and AWS.
+Location: Remote within India.

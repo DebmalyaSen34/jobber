@@ -1,0 +1,29 @@
+{
+  "requirements": [
+    {
+      "id": "r1",
+      "text": "React experience",
+      "kind": "technical",
+      "priority": "must",
+      "evidence": {
+        "quote": "React experience",
+        "start": 28,
+        "end": 44
+      }
+    },
+    {
+      "id": "r2",
+      "text": "Accessibility testing",
+      "kind": "technical",
+      "priority": "nice",
+      "evidence": {
+        "quote": "accessibility testing",
+        "start": 60,
+        "end": 81
+      }
+    }
+  ],
+  "review_notes": [
+    "Absence of a hiring page must not create an invented interview process."
+  ]
+}

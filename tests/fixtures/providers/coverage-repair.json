@@ -1,0 +1,51 @@
+{
+  "case_id": "backend",
+  "first_pass": [
+    {
+      "id": "q1",
+      "requirement_ids": [
+        "r1"
+      ],
+      "category": "technical",
+      "prompt": "How would you diagnose a slow TypeScript API?",
+      "answer_outline": "Explain a concrete example, trade-offs, and validation.",
+      "difficulty": 2
+    },
+    {
+      "id": "q2",
+      "requirement_ids": [
+        "r2"
+      ],
+      "category": "technical",
+      "prompt": "Describe a backend service you built with Python or Java.",
+      "answer_outline": "Explain a concrete example, trade-offs, and validation.",
+      "difficulty": 2
+    },
+    {
+      "id": "q4",
+      "requirement_ids": [
+        "r4"
+      ],
+      "category": "technical",
+      "prompt": "How would you diagnose a failing Kubernetes deployment?",
+      "answer_outline": "Explain a concrete example, trade-offs, and validation.",
+      "difficulty": 2
+    }
+  ],
+  "expected_gap_ids": [
+    "r3"
+  ],
+  "repair_pass": [
+    {
+      "id": "q3",
+      "requirement_ids": [
+        "r3"
+      ],
+      "category": "behavioural",
+      "prompt": "Describe how you helped a junior engineer become more independent.",
+      "answer_outline": "Explain a concrete example, trade-offs, and validation.",
+      "difficulty": 2
+    }
+  ],
+  "expected_final_gap_ids": []
+}

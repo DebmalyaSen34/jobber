@@ -1,0 +1,66 @@
+{
+  "rate_limit_then_success": [
+    {
+      "status": 429,
+      "headers": {
+        "retry-after": "1"
+      },
+      "body": "{\"error\":\"rate limited\"}"
+    },
+    {
+      "status": 200,
+      "body": "{\"summary\":\"Synthetic response after retry\"}"
+    }
+  ],
+  "invalid_json_then_success": [
+    {
+      "status": 200,
+      "body": "{not valid JSON"
+    },
+    {
+      "status": 200,
+      "body": "{\"summary\":\"Repaired synthetic JSON\"}"
+    }
+  ],
+  "incomplete_kit": [
+    {
+      "status": 200,
+      "body": "{\"source\":{}}"
+    }
+  ],
+  "temporary_failure": [
+    {
+      "status": 503,
+      "body": "{\"error\":\"temporarily unavailable\"}"
+    },
+    {
+      "status": 200,
+      "body": "{\"summary\":\"Recovered\"}"
+    }
+  ],
+  "permanent_auth_failure": [
+    {
+      "status": 401,
+      "body": "{\"error\":\"invalid credentials\"}"
+    }
+  ],
+  "provider_timeout": [
+    {
+      "status": 200,
+      "delay_ms": 10000,
+      "body": "{\"summary\":\"Late response\"}"
+    }
+  ],
+  "public_discussion_empty": [
+    {
+      "status": 200,
+      "body": "{\"hits\":[]}"
+    }
+  ],
+  "public_discussion_failure": [
+    {
+      "status": 503,
+      "body": "{\"error\":\"search unavailable\"}"
+    }
+  ]
+}

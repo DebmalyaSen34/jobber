@@ -1,6 +1,6 @@
 # Jobber — AI Interview Prep Kit
 
-Implementation follows the assessment PRD in the parent workspace (`../PRD.md`). **M1 tasks 1–3** are complete: the TypeScript workspace, shared schemas, evaluation CLI contract, deterministic coverage/scheduling, and relational validation. Real research/generation, authentication, and product UI are not implemented yet.
+Implementation follows the assessment PRD in the parent workspace (`../PRD.md`). **M1 tasks 1–4** are complete: the TypeScript workspace, shared schemas, evaluation CLI contract, deterministic coverage/scheduling, relational validation, and reusable synthetic fixtures. Real research/generation, authentication, and product UI are not implemented yet.
 
 ## Setup
 
@@ -25,7 +25,10 @@ Run commands from this repository root. The frontend remains available at `http:
 | `npm test` | Run schema and CLI/batch contract tests using Node's test runner |
 | `npm run test:cli` | Compile and run CLI/batch tests only |
 | `npm run build:cli` | Compile core and the TypeScript CLI |
-| `npm run check` | Lint, typecheck, and test |
+| `npm run check` | Lint, typecheck, and all network-free tests |
+| `npm run test:fixtures` | Verify synthetic JDs, provider responses, and company-site fixtures |
+| `npm run fixtures:serve` | Serve synthetic company sites on loopback port 8099 |
+| `npm run test:fixtures:http` | Verify the real loopback server (requires local port permission) |
 
 ## Evaluation CLI
 
@@ -92,3 +95,14 @@ All functions are exported from `@jobber/core`; no model, database, network, clo
 - Default `generated` mode rejects uncovered must-haves, unscheduled must-haves, and any unscheduled question. Honest nice-have coverage gaps can remain. `draft` mode turns incompleteness into actionable warnings, but still rejects dangling references, malformed structure, and stale coverage. Later editor work must recompute coverage and remove dangling links before saving a valid draft.
 
 M1 task 3 verification: `npm run check` passes all **26 tests** (17 core + 9 CLI), lint, and package/CLI type checks. Tests cover explicit 1/5/60-day cases, priority and immutability, draft-versus-generated rules, malformed references/IDs/days, batch rejection of invalid kits, and an invariant sweep over 240 combinations of material count and days. No live-provider benchmark or new frontend production build was performed.
+
+## Reusable fixtures (M1 task 4)
+
+See [tests/fixtures/README.md](tests/fixtures/README.md) for the scenario catalog, helpers, server routes, and M2 integration instructions.
+
+- Six synthetic JDs cover must/nice wording, experience thresholds, alternatives, mentoring, thin inputs, missing company research, and prompt injection. Expected requirements include exact evidence quotes/offsets and human-review notes.
+- Provider-neutral scripts cover rate limits, malformed JSON, incomplete kits, temporary/auth failures, delayed responses, empty public discussion, and search failures. A first-pass/repair pair deliberately closes a mentoring gap.
+- Company routes cover nested relative-link hiring discovery, a closed no-hiring site, robots restrictions, hostile content, 404, timeouts, redirects/loops/private destinations, unexpected content types, oversized bodies, and retry recovery.
+- `loadCases(origin)` supports an ephemeral test-server origin. Provider and site helpers have isolated per-test histories. The optional HTTP server binds only to loopback and cleans up delayed responses on shutdown.
+
+Verification: `npm run check` passes **31 tests** (17 core, 9 CLI, 5 fixture tests), lint, and TypeScript checks. The separate HTTP integration test also passed after granting local port-binding permission: **32 tests total across both commands**. These fixtures do not prove that the unimplemented extractor, crawler, provider adapter, or repair orchestrator works. Live quality and the five-case/15-minute benchmark remain M2 and release work.

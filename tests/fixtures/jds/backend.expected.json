@@ -1,0 +1,52 @@
+{
+  "requirements": [
+    {
+      "id": "r1",
+      "text": "5+ years building APIs with TypeScript",
+      "kind": "technical",
+      "priority": "must",
+      "evidence": {
+        "quote": "5+ years building APIs with TypeScript.",
+        "start": 51,
+        "end": 90
+      }
+    },
+    {
+      "id": "r2",
+      "text": "Experience with Python or Java",
+      "kind": "technical",
+      "priority": "must",
+      "evidence": {
+        "quote": "Experience with Python or Java.",
+        "start": 93,
+        "end": 124
+      }
+    },
+    {
+      "id": "r3",
+      "text": "Mentor junior engineers",
+      "kind": "behavioural",
+      "priority": "must",
+      "evidence": {
+        "quote": "Mentor junior engineers.",
+        "start": 127,
+        "end": 151
+      }
+    },
+    {
+      "id": "r4",
+      "text": "Kubernetes experience",
+      "kind": "technical",
+      "priority": "nice",
+      "evidence": {
+        "quote": "Kubernetes experience.",
+        "start": 172,
+        "end": 194
+      }
+    }
+  ],
+  "review_notes": [
+    "Do not split Python or Java into two mandatory skills.",
+    "Do not extract React or AWS from company stack context."
+  ]
+}
