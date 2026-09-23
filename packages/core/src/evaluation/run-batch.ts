@@ -5,7 +5,7 @@ import {
   type EvaluationOutput,
   type EvaluationResult,
 } from "../schemas/evaluation.js";
-import { kitSchema } from "../schemas/kit.js";
+import { validateKit } from "../validation/validate-kit.js";
 import { GenerationError, type KitGenerator } from "../pipeline/generate-kit.js";
 
 export class BatchInputError extends Error {
@@ -58,9 +58,9 @@ export async function runBatch(
       continue;
     }
     try {
-      const result = kitSchema.safeParse(await generator(parsed.data));
+      const result = validateKit(await generator(parsed.data), { requestedDays: parsed.data.days });
       if (!result.success) {
-        throw new GenerationError("INVALID_KIT", "The pipeline returned a structurally invalid kit.");
+        throw new GenerationError("INVALID_KIT", "The pipeline returned an invalid or incomplete kit.");
       }
       kits.push({ id: identity.id, status: "ok", kit: result.data, error: null });
     } catch (error) {

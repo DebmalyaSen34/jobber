@@ -1,6 +1,6 @@
 # Jobber — AI Interview Prep Kit
 
-Implementation follows the assessment PRD in the parent workspace (`../PRD.md`). **M1 tasks 1–2** are complete: the TypeScript workspace, shared structural schemas, and evaluation CLI contract. Real generation, reference/coverage validation, scheduling, authentication, and product UI are not implemented yet.
+Implementation follows the assessment PRD in the parent workspace (`../PRD.md`). **M1 tasks 1–3** are complete: the TypeScript workspace, shared schemas, evaluation CLI contract, deterministic coverage/scheduling, and relational validation. Real research/generation, authentication, and product UI are not implemented yet.
 
 ## Setup
 
@@ -43,7 +43,7 @@ Behavior:
 - Reads a JSON array and preserves case IDs and original JD text. Cases execute sequentially.
 - Missing/blank/non-string IDs and duplicate IDs are file-level errors: the runner cannot report results with unambiguous original identities. These are checked before generation.
 - Other invalid case fields produce `INVALID_CASE`; subsequent cases continue. Unexpected pipeline exceptions become `GENERATION_FAILED` without exposing raw exception text.
-- Successful provider results will be checked against the kit schema before output. Relational validation will be connected in the next M1 task.
+- Returned kits pass `validateKit` in generated mode before output: structure, unique IDs, valid references, exact requested days, honest coverage, and scheduled coverage. Invalid/incomplete kits become `INVALID_KIT` without stopping subsequent cases.
 - Writes the exact version `1.0` envelope with an ISO timestamp and one result per identifiable input case. An empty array produces an empty result list.
 - Writes via a temporary file and atomic rename, preserving existing output on input/validation/write failure. The output parent directory must already exist. Input and output cannot refer to the same file, including symlink/hardlink aliases.
 - Exit **0** means the batch completed and its output was written, even if all cases failed. Inspect each case's status. Exit **1** means invalid invocation, invalid input file/identities, or an output/file-level failure.
@@ -68,7 +68,7 @@ Import shared contracts from `@jobber/core`. The package exports compiled ESM an
 
 `kitSchema` implements Appendix A fields and preserves extension data such as warnings and requirement evidence. `evaluationCaseSchema`, `evaluationInputSchema`, and `evaluationOutputSchema` describe Appendix B. Types are inferred from runtime schemas to avoid divergent copies.
 
-These schemas enforce **shape**, enums, required fields, and integer constraints. They do not yet check unique IDs, reference integrity, coverage, or exact requested schedule length; those deterministic validators belong to the remaining M1 work. Passing structural validation alone does not establish that a kit is complete.
+These schemas enforce **shape**, enums, required fields, and integer constraints. Use `validateKit(input, { requestedDays, mode })` for relational validation and completeness. Passing structural validation alone does not establish that a kit is complete.
 
 Unknown company information can remain empty. A case's company URL is retained as text so invalid/unreachable research can later become a warning instead of aborting a useful kit. Source URLs actually used must be HTTP(S). URL syntax validation is not SSRF protection; production/local evaluation fetch policies will be implemented in retrieval. The original JD is retained without whitespace normalization for evidence offsets and character accounting.
 
@@ -79,3 +79,16 @@ Schema tests cover thin kits, preserved warning extensions, integer durations, m
 M1 task 2 adds nine CLI/batch tests covering mixed-case isolation, invalid generated output, safe structured errors, argument errors, malformed JSON, duplicate/missing identities, atomic replacement, file aliases, inaccessible destinations, empty batches, and executable exit codes/stderr. All 14 tests, lint, and package/CLI type checks pass.
 
 Verified for M1 task 1: lint, both package type checks, five schema tests, package import resolution, and a production build using `npm run build --workspace=@jobber/web -- --webpack`. The default Turbopack build could not finish in the restricted agent environment because its internal worker port binding was denied. The default build configuration remains unchanged. The starter's Google fonts also require network access during a fresh build.
+
+## Deterministic core (M1 task 3)
+
+All functions are exported from `@jobber/core`; no model, database, network, clock, or filesystem is used for coverage/allocation decisions.
+
+- `checkCoverage(requirements, questions)` validates input shapes and entity uniqueness, rejects unknown requirement references, and returns covered IDs, all uncovered IDs, and uncovered must-have IDs. It does not judge semantic question relevance or increment generation passes. The real targeted generation/repair loop remains M2 work.
+- `allocateSchedule(requirements, questions, daysAvailable)` refuses uncovered must-haves. It estimates 10/20/30 minutes by question difficulty, sorts by number of distinct must-have requirements covered (descending), then difficulty (descending), then ID (lexical). Inputs are never mutated.
+- First exposure uses `min(questionCount, ceil(daysAvailable * 0.6))` learning days. A question's day index is `floor(previouslyAllocatedMinutes * learningDays / totalMinutes)`, capped to that window. This preserves priority order and approximately balances new work; it does not impose an invented daily time limit.
+- Days without new questions review one already introduced question: least recently studied first, with the same priority order as the stable tie-break. Review uses the same 10/20/30-minute estimate. One day contains all material; long schedules reuse actual question IDs. Empty material creates exactly N zero-minute clarification days. Focus text is derived from categories in code.
+- `validateKit` returns either `{ success: true, data, warnings }` or `{ success: false, errors, warnings }`, with structured issue codes and paths. It validates unique entities and reference lists, existing references, consecutive day numbers, requested day count, and freshly computed coverage. Repeating a question on different days is allowed; repeating it within one day is rejected.
+- Default `generated` mode rejects uncovered must-haves, unscheduled must-haves, and any unscheduled question. Honest nice-have coverage gaps can remain. `draft` mode turns incompleteness into actionable warnings, but still rejects dangling references, malformed structure, and stale coverage. Later editor work must recompute coverage and remove dangling links before saving a valid draft.
+
+M1 task 3 verification: `npm run check` passes all **26 tests** (17 core + 9 CLI), lint, and package/CLI type checks. Tests cover explicit 1/5/60-day cases, priority and immutability, draft-versus-generated rules, malformed references/IDs/days, batch rejection of invalid kits, and an invariant sweep over 240 combinations of material count and days. No live-provider benchmark or new frontend production build was performed.

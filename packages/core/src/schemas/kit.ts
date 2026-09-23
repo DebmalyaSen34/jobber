@@ -5,8 +5,8 @@ const nonnegativeInteger = z.number().int().nonnegative();
 const positiveInteger = z.number().int().positive();
 const timestamp = z.iso.datetime({ offset: true });
 
-// Shape validation only. Coverage, reference integrity, and requested-day
-// matching belong to the deterministic validators in the next M1 tasks.
+// Shape validation only. Use validateKit for reference integrity, computed
+// coverage, requested-day matching, and generated-versus-draft completeness.
 // Loose objects preserve permitted extensions such as evidence and warnings.
 export const requirementSchema = z.looseObject({
   id,
