@@ -6,16 +6,18 @@ services:
     buildCommand: npm ci && npm run build --workspace=@jobber/api
     startCommand: npm run start --workspace=@jobber/api
     healthCheckPath: /health/ready
-    maxShutdownDelaySeconds: 60
+    # maxShutdownDelaySeconds: 60
     envVars:
       - key: NODE_VERSION
         value: 22.17.0
       - key: NODE_ENV
         value: production
+      - key: MONGODB_USERNAME
+      - key: MONGODB_PASSWORD
       - key: MONGODB_URI
         sync: false
       - key: MONGODB_DB
-        value: jobber
+        value: jobber-cluster
       - key: GEMINI_API_KEY
         sync: false
       - key: SESSION_SECRET
