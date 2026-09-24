@@ -12,6 +12,7 @@
     "test:http": "npm run build && node --test tests/http/*.test.mjs"
   },
   "dependencies": {
+    "bcryptjs": "3.0.3",
     "express": "5.2.1",
     "mongodb": "7.6.0",
     "zod": "4.6.5"

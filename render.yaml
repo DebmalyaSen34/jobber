@@ -24,6 +24,16 @@ services:
         sync: false
       - key: SESSION_SECRET
         generateValue: true
+      - key: SESSION_TTL_HOURS
+        value: 168
+      - key: BCRYPT_ROUNDS
+        value: 12
+      - key: LOGIN_WINDOW_MINUTES
+        value: 15
+      - key: LOGIN_EMAIL_LIMIT
+        value: 5
+      - key: LOGIN_IP_LIMIT
+        value: 20
       - key: WEB_ORIGINS
         sync: false
       - key: MONGODB_CONNECT_TIMEOUT_MS

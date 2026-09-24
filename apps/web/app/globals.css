@@ -25,8 +25,8 @@ body {
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
-button, a { -webkit-tap-highlight-color: transparent; }
-a:focus-visible, button:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
+button, a, input { -webkit-tap-highlight-color: transparent; }
+a:focus-visible, button:focus-visible, input:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
 
 .site-shell {
   width: min(1180px, calc(100% - 40px));
@@ -59,6 +59,12 @@ a:focus-visible, button:focus-visible { outline: 3px solid var(--focus); outline
 
 .brand svg { color: var(--ink); }
 .build-label, .site-footer { color: var(--ink-soft); font-size: 0.78rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+.header-actions, .hero-actions { display: flex; align-items: center; gap: 20px; }
+.text-link { min-height: 44px; display: inline-flex; align-items: center; color: var(--ink); font-weight: 750; text-underline-offset: 4px; }
+.compact-button, .primary-link { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; border-radius: 12px; color: var(--paper-strong); background: var(--ink); font-weight: 750; text-decoration: none; }
+.compact-button { padding: 0 17px; font-size: 0.88rem; }
+.primary-link { min-height: 52px; padding: 0 22px; }
+.compact-button:hover, .primary-link:hover { background: #23413c; }
 
 .hero {
   display: grid;
@@ -81,6 +87,7 @@ h1 {
 }
 
 .hero__lede { max-width: 650px; margin: 0; color: var(--ink-soft); font-size: clamp(1.06rem, 2vw, 1.24rem); line-height: 1.65; }
+.hero-actions { margin-top: 32px; }
 
 .foundation-note {
   max-width: 650px;
@@ -142,6 +149,46 @@ code { padding: 0.12em 0.35em; border-radius: 5px; color: var(--ink); background
 .retry-button:disabled { cursor: wait; opacity: 0.65; }
 .site-footer { min-height: 68px; border-top: 1px solid var(--line); border-bottom: 0; }
 
+.auth-shell, .dashboard-shell { width: min(1180px, calc(100% - 40px)); min-height: 100vh; margin: 0 auto; }
+.auth-shell { display: grid; grid-template-rows: auto 1fr auto; }
+.auth-header { min-height: 76px; display: flex; align-items: center; border-bottom: 1px solid var(--line); }
+.auth-main { display: grid; grid-template-columns: minmax(0, 1fr) minmax(360px, 480px); gap: clamp(48px, 9vw, 132px); align-items: center; padding: clamp(64px, 10vh, 110px) 0; }
+.auth-intro h1, .empty-workspace h1 { margin: 20px 0 24px; font-size: clamp(3.3rem, 7vw, 6.6rem); }
+.auth-intro > p:last-child, .empty-workspace > p:last-child { max-width: 610px; margin: 0; color: var(--ink-soft); font-size: 1.08rem; line-height: 1.65; }
+.auth-card, .account-card { border: 1px solid rgba(18, 37, 34, 0.16); border-radius: 24px; background: rgba(255, 254, 249, 0.94); box-shadow: 0 24px 70px rgba(31, 52, 46, 0.1); }
+.auth-card { padding: clamp(24px, 4vw, 38px); }
+.auth-footer { min-height: 68px; display: flex; align-items: center; color: var(--ink-soft); border-top: 1px solid var(--line); font-size: 0.85rem; }
+.auth-form { display: grid; gap: 22px; }
+.field { display: grid; gap: 8px; }
+.field label { font-size: 0.88rem; font-weight: 800; }
+.field input { width: 100%; min-height: 50px; padding: 0 14px; border: 1px solid #abb6ad; border-radius: 11px; color: var(--ink); background: #fff; font: inherit; }
+.field input:hover { border-color: #75857c; }
+.field input[aria-invalid="true"] { border-color: var(--danger); background: #fff9f7; }
+.field-hint, .field-error { margin: 0; font-size: 0.8rem; line-height: 1.45; }
+.field-hint { color: var(--ink-soft); }
+.field-error { color: var(--danger); font-weight: 650; }
+.notice, .form-error, .dashboard-state { padding: 13px 15px; border-radius: 11px; font-size: 0.88rem; line-height: 1.5; }
+.notice { color: #294a1f; background: #f0f8df; border: 1px solid #cbe594; }
+.form-error, .dashboard-state--error { color: #812f25; background: #fff4f0; border: 1px solid #efc6bd; }
+.primary-button, .secondary-button { min-height: 50px; padding: 0 20px; border-radius: 11px; font: inherit; font-weight: 800; cursor: pointer; }
+.primary-button { border: 0; color: var(--paper-strong); background: var(--ink); }
+.primary-button:hover { background: #23413c; }
+.secondary-button { border: 1px solid var(--ink); color: var(--ink); background: transparent; }
+.secondary-button:hover { background: #eef0e8; }
+.primary-button:disabled, .secondary-button:disabled { cursor: wait; opacity: 0.62; }
+.auth-switch { margin: 2px 0 0; color: var(--ink-soft); font-size: 0.9rem; text-align: center; }
+.auth-switch a { color: var(--ink); font-weight: 800; text-underline-offset: 3px; }
+
+.dashboard-shell { display: grid; grid-template-rows: auto 1fr; }
+.dashboard-main { display: grid; align-content: start; gap: 56px; padding: clamp(50px, 8vh, 96px) 0; }
+.account-card { display: flex; align-items: center; justify-content: space-between; gap: 30px; padding: 28px 30px; }
+.account-card h2 { margin: 10px 0 8px; font-family: Georgia, "Times New Roman", serif; font-size: clamp(1.8rem, 4vw, 2.8rem); font-weight: 500; letter-spacing: -0.04em; }
+.account-card p:last-child { margin: 0; color: var(--ink-soft); }
+.account-card .account-error { margin-top: 12px; color: var(--danger); font-weight: 650; }
+.empty-workspace { max-width: 780px; }
+.dashboard-state { color: var(--ink-soft); background: var(--paper-strong); border: 1px solid var(--line); }
+.dashboard-state--error { display: flex; align-items: center; justify-content: space-between; gap: 18px; }
+
 @keyframes pulse { 50% { opacity: 0.35; transform: scale(0.75); } }
 
 @media (prefers-reduced-motion: reduce) {
@@ -154,12 +201,21 @@ code { padding: 0.12em 0.35em; border-radius: 5px; color: var(--ink); background
   .hero { grid-template-columns: 1fr; gap: 48px; padding: 58px 0 64px; }
   h1 { font-size: clamp(3rem, 15vw, 5.2rem); }
   .status-card__body { min-height: 0; padding: 44px 0 38px; }
+  .auth-shell, .dashboard-shell { width: min(100% - 28px, 680px); }
+  .auth-main { grid-template-columns: 1fr; gap: 44px; padding: 52px 0 64px; }
+  .auth-intro h1, .empty-workspace h1 { font-size: clamp(3rem, 14vw, 5rem); }
 }
 
 @media (max-width: 520px) {
   .build-label { max-width: 130px; text-align: right; }
+  .header-actions .text-link { display: none; }
+  .header-actions { gap: 10px; }
+  .hero-actions { align-items: stretch; flex-direction: column; }
+  .hero-actions .text-link { justify-content: center; }
   .status-card__topline, .status-card__footer, .site-footer { align-items: flex-start; flex-direction: column; }
   .status-card__footer { align-items: stretch; }
   .retry-button { width: 100%; }
   .site-footer { justify-content: center; gap: 8px; padding: 18px 0; }
+  .account-card { align-items: stretch; flex-direction: column; padding: 24px; }
+  .secondary-button { width: 100%; }
 }

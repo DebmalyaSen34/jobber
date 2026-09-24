@@ -1,6 +1,6 @@
 # Jobber — AI Interview Prep Kit
 
-Implementation follows the assessment PRD in the parent workspace (`../PRD.md`). **M1 and M2 are complete**. M3 task 1 is in progress: the repository now includes a MongoDB-backed Express API, deployment health checks, exact-origin CORS, Render configuration, and a responsive frontend deployment-status slice. A live deployment and lifecycle verification remain outstanding, so the PRD task is not yet checked off.
+Implementation follows the assessment PRD in the parent workspace (`../PRD.md`). **M1, M2, and M3 task 1 are complete; M3 task 2 is implemented locally and awaits production verification**. The frontend is deployed on Vercel, the MongoDB-backed Express API is deployed on Render, and the production browser-to-API-to-Atlas readiness path is verified. The current code adds persisted authentication, CSRF protection, login throttling, an authenticated workspace, and a reusable ownership guard.
 
 ## Setup
 
@@ -69,7 +69,7 @@ scripts/          TypeScript CLI and integration tests
 examples/         Sample batch input (not a live benchmark)
 ```
 
-The early application slice is intentionally narrow: it validates the deployed web-to-API-to-MongoDB boundary. Authentication, owned kits, background jobs, and the creation workspace are subsequent M3 tasks. Deployment settings and the verification gate are documented in [docs/deployment.md](docs/deployment.md).
+The application now includes registration, login, logout, persisted HttpOnly sessions, and an authenticated dashboard. Browser API requests remain same-origin through a Vercel-to-Render rewrite. Owned kits, background jobs, and the creation workspace are subsequent M3 tasks. See [docs/authentication.md](docs/authentication.md) and [docs/deployment.md](docs/deployment.md).
 
 Import shared contracts from `@jobber/core`. The package exports compiled ESM and TypeScript declarations; root development/build/check commands build it first. After changing core while the frontend is already running, run `npm run build --workspace=@jobber/core` to refresh its compiled output.
 

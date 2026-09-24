@@ -24,7 +24,7 @@ export function ServiceStatus() {
     const timeout = window.setTimeout(() => controller.abort(), 10_000);
 
     try {
-      const response = await fetch(`${apiBaseUrl}/api/v1/status`, {
+      const response = await fetch("/api/v1/status", {
         credentials: "include",
         headers: { Accept: "application/json" },
         signal: controller.signal,

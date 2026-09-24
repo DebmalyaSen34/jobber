@@ -15,8 +15,17 @@ const environmentSchema = z
     RENDER_GIT_COMMIT: z.string().trim().min(1).optional(),
     MONGODB_CONNECT_TIMEOUT_MS: positiveInteger.max(60_000).default(5_000),
     SHUTDOWN_GRACE_MS: positiveInteger.max(60_000).default(10_000),
+    SESSION_TTL_HOURS: positiveInteger.max(24 * 30).default(24 * 7),
+    BCRYPT_ROUNDS: positiveInteger.min(4).max(14).default(12),
+    LOGIN_WINDOW_MINUTES: positiveInteger.max(60).default(15),
+    LOGIN_EMAIL_LIMIT: positiveInteger.max(100).default(5),
+    LOGIN_IP_LIMIT: positiveInteger.max(500).default(20),
   })
   .superRefine((value, context) => {
+    if (!value.SESSION_SECRET) {
+      context.addIssue({ code: "custom", path: ["SESSION_SECRET"], message: "is required" });
+    }
+
     if (
       value.MONGODB_URI &&
       !value.MONGODB_URI.startsWith("mongodb://") &&
@@ -31,7 +40,7 @@ const environmentSchema = z
 
     if (value.NODE_ENV !== "production") return;
 
-    for (const key of ["MONGODB_URI", "SESSION_SECRET", "GEMINI_API_KEY"] as const) {
+    for (const key of ["MONGODB_URI", "GEMINI_API_KEY"] as const) {
       if (!value[key]) {
         context.addIssue({ code: "custom", path: [key], message: "is required in production" });
       }
@@ -44,11 +53,16 @@ export type AppConfig = {
   mongoUri: string;
   mongoDatabase: string;
   webOrigins: readonly string[];
-  sessionSecret?: string;
+  sessionSecret: string;
   geminiApiKey?: string;
   release: string;
   mongoConnectTimeoutMs: number;
   shutdownGraceMs: number;
+  sessionTtlMs: number;
+  bcryptRounds: number;
+  loginWindowMs: number;
+  loginEmailLimit: number;
+  loginIpLimit: number;
 };
 
 function parseOrigins(raw: string): string[] {
@@ -90,10 +104,15 @@ export function loadConfig(input: NodeJS.ProcessEnv = process.env): AppConfig {
     mongoUri: parsed.data.MONGODB_URI,
     mongoDatabase: parsed.data.MONGODB_DB,
     webOrigins: parseOrigins(parsed.data.WEB_ORIGINS),
-    ...(parsed.data.SESSION_SECRET ? { sessionSecret: parsed.data.SESSION_SECRET } : {}),
+    sessionSecret: parsed.data.SESSION_SECRET!,
     ...(parsed.data.GEMINI_API_KEY ? { geminiApiKey: parsed.data.GEMINI_API_KEY } : {}),
     release: parsed.data.APP_RELEASE ?? parsed.data.RENDER_GIT_COMMIT ?? "development",
     mongoConnectTimeoutMs: parsed.data.MONGODB_CONNECT_TIMEOUT_MS,
     shutdownGraceMs: parsed.data.SHUTDOWN_GRACE_MS,
+    sessionTtlMs: parsed.data.SESSION_TTL_HOURS * 60 * 60 * 1_000,
+    bcryptRounds: parsed.data.BCRYPT_ROUNDS,
+    loginWindowMs: parsed.data.LOGIN_WINDOW_MINUTES * 60 * 1_000,
+    loginEmailLimit: parsed.data.LOGIN_EMAIL_LIMIT,
+    loginIpLimit: parsed.data.LOGIN_IP_LIMIT,
   };
 }
