@@ -1,6 +1,6 @@
 # Jobber — AI Interview Prep Kit
 
-Implementation follows the assessment PRD in the parent workspace (`../PRD.md`). **M1 tasks 1–4** are complete: the TypeScript workspace, shared schemas, evaluation CLI contract, deterministic coverage/scheduling, relational validation, and reusable synthetic fixtures. **M2 task 1** is also complete: secure company retrieval and ranked crawling. Public-discussion search, real extraction/generation, authentication, and product UI are not implemented yet.
+Implementation follows the assessment PRD in the parent workspace (`../PRD.md`). **M1 tasks 1–4** are complete: the TypeScript workspace, shared schemas, evaluation CLI contract, deterministic coverage/scheduling, relational validation, and reusable synthetic fixtures. **M2 task 1** is also complete: secure company retrieval and ranked crawling. **M2 task 2** public-discussion search is complete, including live-provider verification. Real extraction/generation, authentication, and product UI are not implemented yet.
 
 ## Setup
 
@@ -117,3 +117,9 @@ See [docs/retrieval.md](docs/retrieval.md) for the API, source policies, limits,
 Production defaults block private/loopback/metadata destinations. Trusted local execution can allow exact loopback origins via `localFixturePolicy`; there is no user-facing bypass. Site-term exclusions can be enforced through trusted `sourceAllowed` configuration; robots is not a substitute for reviewing source terms. No JavaScript rendering or PDF extraction is implemented.
 
 Verification on 2026-09-24: lint/type checks and **47 standard tests**, **5 HTTP retrieval integration tests**, plus a successful public HTTPS smoke crawl of `https://example.com/`. This is not the five-case live-generation benchmark. Retrieval is ready for the shared pipeline; `generateKit` still reports `PIPELINE_NOT_IMPLEMENTED` pending the remaining M2 stages.
+
+## Public discussion (M2 task 2)
+
+`@jobber/core/research` exports `resolveCompanyIdentity` and `searchPublicDiscussions`. The adapter searches Hacker News through Algolia using an evidence-supported company name, filters and deduplicates results, retains anecdotal provenance, and distinguishes skipped, empty, blocked, failed, partial, and successful searches. Only the company name and fixed terms leave the app. It reuses the safe retrieval client through `fetchJson`.
+
+See [docs/public-discussions.md](docs/public-discussions.md) for usage, outcomes, limits, and the repeatable live smoke check. Verification: **59 standard tests and six HTTP integration tests passed**, plus lint/type checks. Live verification passed on 2026-09-24: both GitLab queries returned HTTP 200 and the adapter retained 25 anecdotal items (`found`). Narrow NAT64 support validates the embedded public IPv4 while preserving restricted-address blocks. M2 task 2 is checked off.

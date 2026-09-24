@@ -7,7 +7,7 @@ export class RetrievalError extends Error {
 
 export type SourceTrace = {
   url: string;
-  purpose: "page" | "robots";
+  purpose: "page" | "robots" | "api";
   outcome: "fetched" | "redirect" | "retry" | "skipped" | "failed";
   code?: string;
   status?: number;

@@ -4,12 +4,41 @@ import { gzipSync } from "node:zlib";
 import test from "node:test";
 import { startFixtureServer } from "../../fixtures/serve.mjs";
 import { RetrievalClient, crawlCompany, localFixturePolicy, requestPinned } from "@jobber/core/retrieval";
+import { searchPublicDiscussions } from "@jobber/core/research";
 
 async function fixture(t) {
   const server = await startFixtureServer();
   t.after(() => server.close());
   return { server, options: { policy: localFixturePolicy([server.origin]), minIntervalMs: 0, retries: 0 } };
 }
+
+test("public search uses real JSON HTTP transport, robots, and honest partial results", async (t) => {
+  const requests = [];
+  const server = createServer((req, res) => {
+    requests.push(req.url);
+    if (req.url === "/robots.txt") {
+      res.setHeader("content-type", "text/plain");
+      res.end("User-agent: *\nAllow: /"); return;
+    }
+    const url = new URL(req.url, "http://localhost");
+    if (url.searchParams.get("query") === "GitLab hiring process") {
+      res.statusCode = 503; res.end(); return;
+    }
+    res.setHeader("content-type", "application/json; charset=utf-8");
+    res.end(JSON.stringify({ hits: [{ objectID: "123", _tags: ["comment"], comment_text: "GitLab technical interview included a coding exercise." }] }));
+  });
+  await new Promise((resolve, reject) => { server.once("error", reject); server.listen(0, "127.0.0.1", resolve); });
+  t.after(async () => { await new Promise((resolve) => { server.close(resolve); server.closeAllConnections(); }); });
+  const origin = `http://127.0.0.1:${server.address().port}`;
+  const retrieval = { policy: localFixturePolicy([origin]), minIntervalMs: 0, retries: 0 };
+  const result = await searchPublicDiscussions({ company_url: "https://gitlab.com", jd: "Company: GitLab", pages: [] }, { endpoint: origin + "/api/v1/search", retrieval });
+  assert.equal(result.status, "partial");
+  assert.equal(result.evidence[0].url, "https://news.ycombinator.com/item?id=123");
+  assert.equal(result.attempts[1].code, "HTTP_503");
+  assert.equal(requests.filter((url) => url === "/robots.txt").length, 1);
+  assert.equal(requests.length, 3);
+  await assert.rejects(() => new RetrievalClient(retrieval).fetchPage(origin + "/api/v1/search"), { code: "UNSUPPORTED_CONTENT_TYPE" });
+});
 
 test("real crawler discovers nested hiring and records successful source URLs", async (t) => {
   const { server, options } = await fixture(t);

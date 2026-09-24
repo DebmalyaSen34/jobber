@@ -26,7 +26,18 @@ export function parseHttpUrl(input: string): URL {
 
 export function addressRange(address: string): string {
   if (!isIP(address) || address.includes("%")) return "invalid";
-  return ipaddr.process(address).range();
+  const parsed = ipaddr.process(address);
+  const bytes = parsed.toByteArray();
+  // RFC 6052's well-known /96 prefix only: its last 32 bits are IPv4.
+  // Never classify translated loopback as local (including fixture policies).
+  const nat64Prefix = [0, 0x64, 0xff, 0x9b, 0, 0, 0, 0, 0, 0, 0, 0];
+  if (bytes.length === 16 && nat64Prefix.every((byte, index) => bytes[index] === byte)) {
+    return ipaddr.fromByteArray(bytes.slice(12)).range() === "unicast" ? "unicast" : "rfc6052";
+  }
+  const range = parsed.range();
+  // Deprecated IPv4-compatible ::/96 is not ordinary public IPv6.
+  if (range === "unicast" && bytes.length === 16 && bytes.slice(0, 12).every((byte) => byte === 0)) return "reserved";
+  return range;
 }
 
 export function localFixturePolicy(origins: readonly string[]): FetchPolicy {

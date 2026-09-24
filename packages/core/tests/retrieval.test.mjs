@@ -197,3 +197,38 @@ test("DNS changes between validation and request cannot bypass the address polic
   await assert.rejects(() => client.fetchPage("https://company.test/"), { code: "BLOCKED_ADDRESS" });
   assert.equal(transports, 0);
 });
+
+test("well-known NAT64 accepts public IPv4 only and retains the pinned IPv6 address", async () => {
+  for (const address of ["64:ff9b::22a0:a8b5", "0064:ff9b:0000:0000:0000:0000:0808:0808", "64:ff9b::8.8.8.8"]) {
+    const result = await validateDestination("https://example.com", {}, async () => [{ address, family: 6 }, { address: "8.8.8.8", family: 4 }]);
+    assert.deepEqual(result.address, { address, family: 6 });
+    await validateDestination(`https://[${address}]/`);
+  }
+});
+
+test("NAT64 cannot hide restricted IPv4, mixed DNS answers, or bypass fixture policy", async () => {
+  for (const ipv4 of ["127.0.0.1", "10.0.0.1", "172.16.0.1", "192.168.1.1", "169.254.169.254", "100.64.0.1", "0.0.0.0", "192.0.2.1", "198.18.0.1", "224.0.0.1", "255.255.255.255"]) {
+    const address = `64:ff9b::${ipv4}`;
+    await assert.rejects(() => validateDestination(`http://[${address}]/`), { code: "BLOCKED_ADDRESS" });
+    await assert.rejects(() => validateDestination("https://example.com", {}, async () => [{ address: "8.8.8.8", family: 4 }, { address, family: 6 }]), { code: "BLOCKED_ADDRESS" });
+  }
+  assert.throws(() => localFixturePolicy(["http://[64:ff9b::127.0.0.1]"]), { code: "INVALID_POLICY" });
+  await assert.rejects(() => validateDestination("http://localhost:8099", localFixturePolicy(["http://localhost:8099"]), async () => [{ address: "64:ff9b::127.0.0.1", family: 6 }]), { code: "BLOCKED_ADDRESS" });
+  for (const address of ["64:ff9b:1::808:808", "2002:0808:0808::1", "::808:808"]) {
+    await assert.rejects(() => validateDestination(`https://[${address}]/`), { code: "BLOCKED_ADDRESS" });
+  }
+});
+
+test("NAT64 metadata redirects are rejected before their robots or content is fetched", async () => {
+  const requests = [];
+  const client = new RetrievalClient(noWait, {
+    resolver: publicResolver,
+    transport: async (url) => {
+      requests.push(url.href);
+      if (url.pathname === "/robots.txt") return { status: 200, headers: {}, text: "User-agent: *\nAllow: /" };
+      return { status: 302, headers: { location: "http://[64:ff9b::a9fe:a9fe]/latest/meta-data/" }, text: "" };
+    },
+  });
+  await assert.rejects(() => client.fetchPage("https://example.com/"), { code: "BLOCKED_ADDRESS" });
+  assert.ok(requests.every((url) => new URL(url).hostname === "example.com"));
+});

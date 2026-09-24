@@ -90,7 +90,7 @@ export class RetrievalClient {
         const response = await (this.dependencies.transport ?? requestPinned)(destination.url, destination.address, {
           deadline, maxBytes: purpose === "robots" ? Math.min(this.options.maxBytes, 512000) : this.options.maxBytes,
           maxDecodedBytes: purpose === "robots" ? Math.min(this.options.maxDecodedBytes, 512000) : this.options.maxDecodedBytes,
-          contentTypes: purpose === "robots" ? ["text/plain"] : ["text/html", "application/xhtml+xml", "text/plain"],
+          contentTypes: purpose === "robots" ? ["text/plain"] : purpose === "api" ? ["application/json"] : ["text/html", "application/xhtml+xml", "text/plain"],
         });
         if ((response.status === 429 || [500, 502, 503, 504].includes(response.status)) && attempt < this.options.retries) {
           this.record(url.href, purpose, "retry", { status: response.status, attempt: attempt + 1 });
@@ -140,7 +140,7 @@ export class RetrievalClient {
     for (let redirects = 0; ; redirects++) {
       if (seen.has(url.href)) throw new RetrievalError("REDIRECT_LOOP", "Redirect loop detected.");
       seen.add(url.href);
-      if (purpose === "page") {
+      if (purpose !== "robots") {
         // Check destination even before attempting its robots endpoint.
         await withinDeadline(validateDestination(url.href, this.config.policy, this.dependencies.resolver), deadline);
         const rules = await this.rules(url, deadline);
@@ -157,16 +157,30 @@ export class RetrievalClient {
 
   /** Serializes calls on this client, including robots requests and retries. */
   fetchPage(input: string): Promise<HttpResponse & { url: string }> {
+    return this.fetchResource(input, "page");
+  }
+
+  /** JSON APIs retain the same address, robots, redirect, rate, and byte controls. */
+  async fetchJson(input: string): Promise<{ data: unknown; url: string }> {
+    const response = await this.fetchResource(input, "api");
+    try { return { data: JSON.parse(response.text), url: response.url }; }
+    catch {
+      this.record(input, "api", "failed", { code: "INVALID_JSON" });
+      throw new RetrievalError("INVALID_JSON", "API response was not valid JSON.");
+    }
+  }
+
+  private fetchResource(input: string, purpose: "page" | "api"): Promise<HttpResponse & { url: string }> {
     const task = this.queue.then(async () => {
       try {
         const url = parseHttpUrl(input);
         const deadline = Math.min(this.deadline, Date.now() + this.options.timeoutMs);
-        const result = await this.follow(url, "page", deadline);
+        const result = await this.follow(url, purpose, deadline);
         if (result.status < 200 || result.status >= 300) throw new RetrievalError(`HTTP_${result.status}`, "Source returned an unsuccessful HTTP status.");
         return result;
       } catch (error) {
         const safe = error instanceof RetrievalError ? error : new RetrievalError("NETWORK_ERROR", "Source could not be retrieved.");
-        this.record(input, "page", "skipped", { code: safe.code });
+        this.record(input, purpose, "skipped", { code: safe.code });
         throw safe;
       }
     });

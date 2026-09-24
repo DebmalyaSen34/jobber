@@ -20,14 +20,14 @@ Build core before standalone Node imports: `npm run build --workspace=@jobber/co
 
 `crawlCompany` returns cleaned `pages`, candidate `hiring_pages`, `trace`, `warnings`, and `researched_at`. Each page includes its final URL, title, capped plain text, discovered/ranked links, coarse kind, truncation flag, discovery parent/depth, and `trust: 'untrusted'`.
 
-Traces include page/robots purpose, timestamp, HTTP status or safe error code, attempt number, and fetched/redirect/retry/failed/skipped outcome. Credentials, query strings, and fragments are stripped from trace URLs. Raw exception messages are not exposed. Successful robots retrieval is not company evidence. The later pipeline must set `pages_used` from pages it actually uses, not from every attempted URL.
+Traces include page/robots/API purpose, timestamp, HTTP status or safe error code, attempt number, and fetched/redirect/retry/failed/skipped outcome. Credentials, query strings, and fragments are stripped from trace URLs. Raw exception messages are not exposed. Successful robots retrieval is not company evidence. The later pipeline must set `pages_used` from pages it actually uses, not from every attempted URL.
 
 Hiring classification is a deterministic heuristic, not a factual guarantee about the current interview process. Link labels alone do not establish hiring evidence. Retain source text and provenance for later grounded synthesis. Cleaned HTML is still untrusted text; later model prompts must not follow instructions embedded in it.
 
 ## Fetch policy and transport
 
 - Only HTTP(S), no embedded URL credentials, and production web ports 80/443.
-- All DNS answers are checked with `ipaddr.js`; non-unicast IPv4/IPv6 ranges are rejected, including loopback, private, link-local/metadata, carrier-grade NAT, multicast, and reserved ranges. IPv4-mapped addresses are checked as IPv4.
+- All DNS answers are checked with `ipaddr.js`; non-unicast IPv4/IPv6 ranges are rejected, including loopback, private, link-local/metadata, carrier-grade NAT, multicast, and reserved ranges. IPv4-mapped addresses are checked as IPv4. The well-known NAT64 `64:ff9b::/96` prefix is permitted only when its embedded IPv4 is public unicast; restricted translations never qualify for local fixture exceptions. All answers remain validated and the original IPv6 address stays pinned. This narrow mapping follows [RFC 6052](https://www.rfc-editor.org/rfc/rfc6052.html#section-2.2). Other classified transition ranges stay blocked; deprecated IPv4-compatible `::/96` addresses are explicitly rejected.
 - The selected validated address is supplied to Node's socket lookup. There is no second DNS lookup at connection time. Original Host and normal HTTPS certificate verification remain intact.
 - Every redirect is processed manually and revalidated; loops and excessive hops are rejected. Each redirected page is checked against its own origin's robots rules before retrieval.
 - No forwarded credentials, cookie jar, arbitrary request headers, proxy environment, or pooled socket is used.
@@ -90,4 +90,8 @@ The standard suite uses injected resolver/transport fixtures without networking.
 
 Verified on 2026-09-24: 47 standard tests (33 core, 9 CLI, 5 fixtures), five real HTTP retrieval tests, and a public HTTPS smoke fetch of `https://example.com/`. The public smoke produced one page and honest no-hiring/no-company warnings. No API credentials or paid service were needed. The earlier standalone fixture-server test was not part of this task's count.
 
-Limitations: no JavaScript rendering, PDF extraction, charset detection beyond UTF-8, sitemap expansion, or guarantee of finding every hiring page. HTML visibility based solely on external CSS is not evaluated. Heading/text classification and keyword ranking are heuristics. Public discussion search is M2 task 2; real requirement extraction and generation remain later tasks. The evaluate command still reports `PIPELINE_NOT_IMPLEMENTED` until orchestration is built. This is not a live five-case generation benchmark.
+Limitations: no JavaScript rendering, PDF extraction, charset detection beyond UTF-8, sitemap expansion, or guarantee of finding every hiring page. HTML visibility based solely on external CSS is not evaluated. Heading/text classification and keyword ranking are heuristics. Public discussion search is implemented separately in M2 task 2; see [public-discussions.md](public-discussions.md) for its successful live acceptance check. Real requirement extraction and generation remain later tasks. The evaluate command still reports `PIPELINE_NOT_IMPLEMENTED` until orchestration is built. This is not a live five-case generation benchmark.
+
+M2 task 2 adds `fetchJson`, accepting `application/json` under the same destination/robots/redirect/transport protections. JSON parsing failures report `INVALID_JSON`; page content types are unchanged. The HTTP suite now includes six tests, with a real JSON search and partial-failure scenario.
+
+NAT64 follow-up verification: 59 standard tests, lint/type checks, six HTTP tests, and two successful live Algolia queries on 2026-09-24. No DNS/TLS/robots bypass or resolver override was used.
