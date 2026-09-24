@@ -1,69 +1,45 @@
-import Image from "next/image";
+import { ServiceStatus } from "@/components/service-status";
+
+function Mark() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 36 36" width="36" height="36">
+      <rect width="36" height="36" rx="11" fill="currentColor" />
+      <path d="M11 11h14v9.2c0 4.2-3.1 7.3-7.2 7.3-3.7 0-6.5-2.2-7.1-5.6l4-.8c.3 1.6 1.3 2.5 3 2.5 1.8 0 3-1.3 3-3.5v-5.2H11V11Z" fill="#F6F8F1" />
+    </svg>
+  );
+}
 
 export default function Home() {
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+    <div className="site-shell">
+      <header className="site-header">
+        <a className="brand" href="#main" aria-label="Jobber home">
+          <Mark />
+          <span>Jobber</span>
+        </a>
+        <span className="build-label">Foundation preview</span>
+      </header>
+
+      <main id="main" className="hero">
+        <div className="hero__copy">
+          <p className="eyebrow">Interview preparation, grounded in the role</p>
+          <h1>Turn a job description into a plan you can practise.</h1>
+          <p className="hero__lede">
+            Jobber researches the company, extracts evidence-backed requirements, and builds a focused preparation kit around the time you have.
           </p>
+          <div className="foundation-note">
+            <span aria-hidden="true">01</span>
+            <p><strong>The durable foundation comes first.</strong> This early slice verifies the web app, API, and database boundary before user accounts and background generation arrive.</p>
+          </div>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
+
+        <ServiceStatus />
       </main>
+
+      <footer className="site-footer">
+        <span>Evidence-backed preparation</span>
+        <span>Built for focused interview days</span>
+      </footer>
     </div>
   );
 }

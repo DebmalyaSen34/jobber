@@ -1,6 +1,6 @@
 # Jobber — AI Interview Prep Kit
 
-Implementation follows the assessment PRD in the parent workspace (`../PRD.md`). **M1 and M2 are complete**: the workspace and contracts, deterministic coverage/scheduling, fixtures, secure research, evidence-validated extraction, category generation and repair, flashcards, provider reliability controls, and the shared end-to-end pipeline. Authentication, persistence, deployment, and the product UI remain later milestones.
+Implementation follows the assessment PRD in the parent workspace (`../PRD.md`). **M1 and M2 are complete**. M3 task 1 is in progress: the repository now includes a MongoDB-backed Express API, deployment health checks, exact-origin CORS, Render configuration, and a responsive frontend deployment-status slice. A live deployment and lifecycle verification remain outstanding, so the PRD task is not yet checked off.
 
 ## Setup
 
@@ -11,15 +11,17 @@ npm ci
 npm run dev
 ```
 
-Run commands from this repository root. The frontend remains available at `http://localhost:3000`.
+Run commands from this repository root. The frontend is available at `http://localhost:3000`. To exercise the foundation locally, configure MongoDB in `.env`, copy `apps/web/.env.example` to `apps/web/.env.local`, and run `npm run dev:api` in a second terminal. See [docs/deployment.md](docs/deployment.md).
 
 ## Commands
 
 | Command | Purpose |
 | --- | --- |
 | `npm run dev` | Build shared core and start the Next.js development server |
-| `npm run build` | Build core declarations/JavaScript and the production frontend |
+| `npm run dev:api` | Start the Express API with root `.env` values |
+| `npm run build` | Build core, API, and the production frontend |
 | `npm start` | Serve the built frontend |
+| `npm run start:api` | Serve the built API |
 | `npm run lint` | Lint workspace sources |
 | `npm run typecheck` | Build core, generate Next.js route types, and check packages and CLI |
 | `npm test` | Run schema and CLI/batch contract tests using Node's test runner |
@@ -30,6 +32,7 @@ Run commands from this repository root. The frontend remains available at `http:
 | `npm run fixtures:serve` | Serve synthetic company sites on loopback port 8099 |
 | `npm run test:fixtures:http` | Verify the real loopback fixture server (requires local port permission) |
 | `npm run test:retrieval:http` | Verify real retrieval sockets, security controls, and crawling on local fixtures |
+| `npm run test:api:http` | Build and verify API configuration, CORS, health, and status behavior |
 
 ## Evaluation CLI
 
@@ -59,13 +62,14 @@ The five-case live-provider benchmark completed successfully in 122.22 seconds. 
 ## Structure
 
 ```text
-apps/web/          Existing Next.js + Tailwind frontend
+apps/api/          Express API, MongoDB readiness, and lifecycle handling
+apps/web/          Next.js + Tailwind frontend
 packages/core/    Shared schemas, batch runner, and pipeline entry point
 scripts/          TypeScript CLI and integration tests
 examples/         Sample batch input (not a live benchmark)
 ```
 
-The Express backend will be added under `apps/api` in a later milestone. Existing frontend files were moved without changing the starter UI.
+The early application slice is intentionally narrow: it validates the deployed web-to-API-to-MongoDB boundary. Authentication, owned kits, background jobs, and the creation workspace are subsequent M3 tasks. Deployment settings and the verification gate are documented in [docs/deployment.md](docs/deployment.md).
 
 Import shared contracts from `@jobber/core`. The package exports compiled ESM and TypeScript declarations; root development/build/check commands build it first. After changing core while the frontend is already running, run `npm run build --workspace=@jobber/core` to refresh its compiled output.
 
@@ -83,7 +87,7 @@ Schema tests cover thin kits, preserved warning extensions, integer durations, m
 
 M1 task 2 adds nine CLI/batch tests covering mixed-case isolation, invalid generated output, safe structured errors, argument errors, malformed JSON, duplicate/missing identities, atomic replacement, file aliases, inaccessible destinations, empty batches, and executable exit codes/stderr. All 14 tests, lint, and package/CLI type checks pass.
 
-Verified for M1 task 1: lint, both package type checks, five schema tests, package import resolution, and a production build using `npm run build --workspace=@jobber/web -- --webpack`. The default Turbopack build could not finish in the restricted agent environment because its internal worker port binding was denied. The default build configuration remains unchanged. The starter's Google fonts also require network access during a fresh build.
+Verified for M1 task 1: lint, both package type checks, five schema tests, package import resolution, and a production build using webpack. M3 task 1 removed the starter's remote font dependency. The current page again builds and prerenders with webpack; the default Turbopack build still cannot finish in the restricted agent environment because its internal CSS worker port binding is denied.
 
 ## Deterministic core (M1 task 3)
 
