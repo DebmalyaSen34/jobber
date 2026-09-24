@@ -54,7 +54,7 @@ The private redirect is deliberately a dangerous destination string. Neither hel
 ## Remaining M2 integration
 
 - Feed raw JDs through the real extractor and compare with reviewed annotations.
-- Crawl these sites through the production retrieval code using its trusted local-test policy; verify discovery, robots, cleaning, size/type/time limits, and request history.
+- Completed in M2 task 1: the real retrieval client/crawler is exercised against these sites using a trusted loopback-origin policy. Run `npm run test:retrieval:http`; see `docs/retrieval.md` for verification and limitations.
 - Feed scripted provider responses through the actual adapter/orchestrator; verify retries, bounded repair, category-specific calls, and gap closure.
 - Test actual connection failures with an injected transport rather than relying on an arbitrary unused port.
 - Run separate live-provider quality and timing benchmarks; fixture speed proves neither.

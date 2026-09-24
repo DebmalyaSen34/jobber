@@ -7,6 +7,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./retrieval": {
+      "types": "./dist/retrieval/index.d.ts",
+      "default": "./dist/retrieval/index.js"
     }
   },
   "files": [
@@ -18,6 +22,9 @@
     "test": "npm run build && node --test tests/*.test.mjs"
   },
   "dependencies": {
+    "cheerio": "1.2.0",
+    "ipaddr.js": "2.5.0",
+    "robots-parser": "3.0.1",
     "zod": "4.6.5"
   }
 }

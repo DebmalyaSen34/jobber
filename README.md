@@ -1,6 +1,6 @@
 # Jobber — AI Interview Prep Kit
 
-Implementation follows the assessment PRD in the parent workspace (`../PRD.md`). **M1 tasks 1–4** are complete: the TypeScript workspace, shared schemas, evaluation CLI contract, deterministic coverage/scheduling, relational validation, and reusable synthetic fixtures. Real research/generation, authentication, and product UI are not implemented yet.
+Implementation follows the assessment PRD in the parent workspace (`../PRD.md`). **M1 tasks 1–4** are complete: the TypeScript workspace, shared schemas, evaluation CLI contract, deterministic coverage/scheduling, relational validation, and reusable synthetic fixtures. **M2 task 1** is also complete: secure company retrieval and ranked crawling. Public-discussion search, real extraction/generation, authentication, and product UI are not implemented yet.
 
 ## Setup
 
@@ -28,7 +28,8 @@ Run commands from this repository root. The frontend remains available at `http:
 | `npm run check` | Lint, typecheck, and all network-free tests |
 | `npm run test:fixtures` | Verify synthetic JDs, provider responses, and company-site fixtures |
 | `npm run fixtures:serve` | Serve synthetic company sites on loopback port 8099 |
-| `npm run test:fixtures:http` | Verify the real loopback server (requires local port permission) |
+| `npm run test:fixtures:http` | Verify the real loopback fixture server (requires local port permission) |
+| `npm run test:retrieval:http` | Verify real retrieval sockets, security controls, and crawling on local fixtures |
 
 ## Evaluation CLI
 
@@ -73,7 +74,7 @@ Import shared contracts from `@jobber/core`. The package exports compiled ESM an
 
 These schemas enforce **shape**, enums, required fields, and integer constraints. Use `validateKit(input, { requestedDays, mode })` for relational validation and completeness. Passing structural validation alone does not establish that a kit is complete.
 
-Unknown company information can remain empty. A case's company URL is retained as text so invalid/unreachable research can later become a warning instead of aborting a useful kit. Source URLs actually used must be HTTP(S). URL syntax validation is not SSRF protection; production/local evaluation fetch policies will be implemented in retrieval. The original JD is retained without whitespace normalization for evidence offsets and character accounting.
+Unknown company information can remain empty. A case's company URL is retained as text so invalid/unreachable research can later become a warning instead of aborting a useful kit. Source URLs actually used must be HTTP(S). URL syntax validation is not SSRF protection; the server-only retrieval module now enforces production public-address restrictions and explicit trusted loopback-origin exceptions. The original JD is retained without whitespace normalization for evidence offsets and character accounting.
 
 ## Verification
 
@@ -106,3 +107,13 @@ See [tests/fixtures/README.md](tests/fixtures/README.md) for the scenario catalo
 - `loadCases(origin)` supports an ephemeral test-server origin. Provider and site helpers have isolated per-test histories. The optional HTTP server binds only to loopback and cleans up delayed responses on shutdown.
 
 Verification: `npm run check` passes **31 tests** (17 core, 9 CLI, 5 fixture tests), lint, and TypeScript checks. The separate HTTP integration test also passed after granting local port-binding permission: **32 tests total across both commands**. These fixtures do not prove that the unimplemented extractor, crawler, provider adapter, or repair orchestrator works. Live quality and the five-case/15-minute benchmark remain M2 and release work.
+
+## Company retrieval (M2 task 1)
+
+See [docs/retrieval.md](docs/retrieval.md) for the API, source policies, limits, dependency choices, security model, and verified behavior.
+
+`@jobber/core/retrieval` exports a server-only client, HTML cleaner, and bounded crawler. It validates DNS/IP destinations and redirect targets, pins socket resolution, handles robots and pacing, enforces encoded/decoded byte and time limits, ranks discovered relative/external hiring links, and records source outcomes. Missing sources yield warnings alongside any usable pages. HTML text remains explicitly untrusted.
+
+Production defaults block private/loopback/metadata destinations. Trusted local execution can allow exact loopback origins via `localFixturePolicy`; there is no user-facing bypass. Site-term exclusions can be enforced through trusted `sourceAllowed` configuration; robots is not a substitute for reviewing source terms. No JavaScript rendering or PDF extraction is implemented.
+
+Verification on 2026-09-24: lint/type checks and **47 standard tests**, **5 HTTP retrieval integration tests**, plus a successful public HTTPS smoke crawl of `https://example.com/`. This is not the five-case live-generation benchmark. Retrieval is ready for the shared pipeline; `generateKit` still reports `PIPELINE_NOT_IMPLEMENTED` pending the remaining M2 stages.
