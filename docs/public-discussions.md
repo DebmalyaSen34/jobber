@@ -14,7 +14,7 @@ const discussion = await searchPublicDiscussions({
 });
 ```
 
-This is an independently usable research stage. It is not wired into `generateKit` yet; the evaluation CLI continues to return `PIPELINE_NOT_IMPLEMENTED` until later M2 work.
+This remains independently usable and is also wired into `generateKit`. Search failures or unresolved identity produce explicit outcomes and warnings while the pipeline continues from the JD and any official evidence.
 
 ## Company identity and outbound data
 

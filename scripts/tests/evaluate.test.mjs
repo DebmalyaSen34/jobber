@@ -124,16 +124,18 @@ test("empty batches are valid and do not invoke generation", async (t) => {
   assert.deepEqual(JSON.parse(await readFile(f.output, "utf8")).kits, []);
 });
 
-test("actual executable reports unimplemented pipeline, exits 0 for case failures, writes diagnostics to stderr", async (t) => {
+test("actual executable reports missing provider configuration safely and preserves per-case isolation", async (t) => {
   const f = await files(t, [caseInput("a"), caseInput("b")]);
   const executable = fileURLToPath(new URL("../../dist/scripts/evaluate.mjs", import.meta.url));
-  const result = spawnSync(process.execPath, [executable, ...f.args], { encoding: "utf8" });
+  const env = { ...process.env };
+  delete env.GEMINI_API_KEY;
+  const result = spawnSync(process.execPath, [executable, ...f.args], { encoding: "utf8", env });
   assert.equal(result.status, 0, result.stderr);
   assert.equal(result.stdout, "");
   assert.match(result.stderr, /0 ok, 2 failed/);
   const output = JSON.parse(await readFile(f.output, "utf8"));
   assert.equal(evaluationOutputSchema.safeParse(output).success, true);
-  assert.deepEqual(output.kits.map((entry) => entry.error.code), ["PIPELINE_NOT_IMPLEMENTED", "PIPELINE_NOT_IMPLEMENTED"]);
+  assert.deepEqual(output.kits.map((entry) => entry.error.code), ["PROVIDER_CONFIGURATION", "PROVIDER_CONFIGURATION"]);
   const bad = spawnSync(process.execPath, [executable], { encoding: "utf8" });
   assert.equal(bad.status, 1);
   assert.match(bad.stderr, /INVALID_ARGUMENTS/);

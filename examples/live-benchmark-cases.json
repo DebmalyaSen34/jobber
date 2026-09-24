@@ -1,0 +1,32 @@
+[
+  {
+    "id": "benchmark-detailed-hiring",
+    "jd": "Senior Backend Engineer\nRequired qualifications:\n- 5+ years building APIs with TypeScript.\n- Experience with Python or Java.\n- Mentor junior engineers.\nBonus points for:\n- Kubernetes experience.\nOur platform uses React and AWS.\nLocation: Remote within India.\n",
+    "company_url": "http://127.0.0.1:8099/acme/",
+    "days": 5
+  },
+  {
+    "id": "benchmark-behavioural",
+    "jd": "Engineering Lead\nYou will mentor junior engineers and resolve disagreements constructively.\nRequired: experience designing reliable distributed systems.\nPreferred: experience in healthcare.\nDegree or equivalent practical experience required.\n",
+    "company_url": "http://127.0.0.1:8099/acme/",
+    "days": 5
+  },
+  {
+    "id": "benchmark-thin-60-days",
+    "jd": "Engineer wanted.\nContact us for role details.\n",
+    "company_url": "http://127.0.0.1:8099/no-hiring/",
+    "days": 60
+  },
+  {
+    "id": "benchmark-no-hiring-page",
+    "jd": "Frontend Engineer\nRequired: React experience.\nNice to have: accessibility testing.\n",
+    "company_url": "http://127.0.0.1:8099/no-hiring/",
+    "days": 1
+  },
+  {
+    "id": "benchmark-unreachable-edge",
+    "jd": "Backend Engineer\nRequired: SQL query optimization.\n",
+    "company_url": "http://127.0.0.1:8099/failures/missing",
+    "days": 1
+  }
+]

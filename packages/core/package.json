@@ -15,6 +15,14 @@
     "./research": {
       "types": "./dist/research/index.d.ts",
       "default": "./dist/research/index.js"
+    },
+    "./generation": {
+      "types": "./dist/generation/index.d.ts",
+      "default": "./dist/generation/index.js"
+    },
+    "./extraction": {
+      "types": "./dist/extraction/index.d.ts",
+      "default": "./dist/extraction/index.js"
     }
   },
   "files": [

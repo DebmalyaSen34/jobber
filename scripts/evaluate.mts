@@ -2,7 +2,7 @@ import { mkdtemp, readFile, rename, rm, stat, writeFile } from "node:fs/promises
 import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
-import { BatchInputError, generateKit, runBatch, type KitGenerator } from "@jobber/core";
+import { BatchInputError, generateEvaluationKit, runBatch, type KitGenerator } from "@jobber/core";
 
 const usage = "Usage: npm run evaluate -- --input <cases.json> --output <kits.json>";
 
@@ -63,7 +63,7 @@ async function writeAtomically(output: string, content: string) {
 /** Dependency injection is for contract tests; the command always uses generateKit. */
 export async function runCli(
   args: string[],
-  generator: KitGenerator = generateKit,
+  generator: KitGenerator = generateEvaluationKit,
   diagnostic: (message: string) => void = (message) => process.stderr.write(`${message}\n`),
 ): Promise<number> {
   try {

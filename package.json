@@ -21,7 +21,7 @@
     "predev": "npm run build --workspace=@jobber/core",
     "build:cli": "npm run build --workspace=@jobber/core && tsc -p tsconfig.scripts.json",
     "preevaluate": "npm run build:cli",
-    "evaluate": "node dist/scripts/evaluate.mjs",
+    "evaluate": "node --env-file-if-exists=.env dist/scripts/evaluate.mjs",
     "test:cli": "npm run build:cli && node --test scripts/tests/*.test.mjs",
     "test:fixtures": "npm run build --workspace=@jobber/core && node --test tests/fixtures/*.test.mjs",
     "fixtures:serve": "node tests/fixtures/serve.mjs",
