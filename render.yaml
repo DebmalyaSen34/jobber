@@ -3,7 +3,7 @@ services:
     name: jobber-api
     runtime: node
     plan: free
-    buildCommand: npm ci && npm run build --workspace=@jobber/api
+    buildCommand: npm ci --include=dev && npm run build --workspace=@jobber/api
     startCommand: npm run start --workspace=@jobber/api
     healthCheckPath: /health/ready
     # maxShutdownDelaySeconds: 60
