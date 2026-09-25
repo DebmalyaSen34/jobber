@@ -14,6 +14,7 @@ import {
   createGeminiProviderFromEnv,
   generateCompanyBrief,
   generateFlashcards,
+  generateQuestionCategory,
   generateQuestionsWithCoverage,
   GenerationContentError,
   ProviderError,
@@ -36,6 +37,16 @@ export type KitGenerator = (
   input: EvaluationCase,
   onProgress?: (progress: PipelineProgress) => void | Promise<void>,
 ) => Promise<Kit>;
+
+export type RegenerationTarget =
+  | { type: "company-brief" }
+  | { type: "question-category"; category: import("../generation/questions.js").QuestionCategory }
+  | { type: "schedule" };
+
+export type RegeneratedSection =
+  | { type: "company-brief"; companyBrief: Kit["company_brief"] }
+  | { type: "question-category"; category: import("../generation/questions.js").QuestionCategory; questions: Kit["questions"] }
+  | { type: "schedule"; schedule: Kit["schedule"] };
 
 export type PipelineStage =
   | "researching"
@@ -169,7 +180,7 @@ function warningsFor(
 
 function generationContext(
   title: string,
-  brief: Awaited<ReturnType<typeof generateCompanyBrief>>["brief"],
+  brief: Pick<Awaited<ReturnType<typeof generateCompanyBrief>>["brief"], "summary" | "what_they_do" | "sources">,
   pages: CrawlResult["pages"],
   discussions: readonly DiscussionEvidence[],
 ) {
@@ -345,3 +356,49 @@ export const generateEvaluationKit: KitGenerator = async (input) => {
     throw safeGenerationError(error);
   }
 };
+
+/** Production section regeneration. Persistence owns the conflict-safe merge. */
+export async function regenerateKitSection(input: {
+  kit: Kit;
+  jd: string;
+  target: RegenerationTarget;
+}): Promise<RegeneratedSection> {
+  if (input.target.type === "schedule") {
+    return {
+      type: "schedule",
+      schedule: allocateSchedule(input.kit.role.requirements, input.kit.questions, input.kit.schedule.days_available),
+    };
+  }
+  const env = process.env;
+  const dependencies = configuredDependencies(env);
+  const options = optionsFromEnv(env);
+  const now = dependencies.now ?? Date.now;
+  const provider = new ReliableJsonProvider(dependencies.provider, {
+    deadline: now() + (options.deadlineMs ?? defaultDeadlineMs),
+    maxRequests: options.providerMaxRequests,
+    maxTokens: options.providerMaxTokens,
+    retries: options.providerRetries,
+    baseDelayMs: options.providerBaseDelayMs,
+    maxRetryDelayMs: options.providerMaxRetryDelayMs,
+    gate: dependencies.providerGate,
+    now,
+    sleep: dependencies.sleep,
+    random: dependencies.random,
+  });
+  if (input.target.type === "question-category") {
+    const generated = await generateQuestionCategory(input.kit.role.requirements, input.target.category, provider, {
+      context: generationContext(input.kit.role.title, input.kit.company_brief, [], []),
+    });
+    return { type: "question-category", category: input.target.category, questions: generated.questions };
+  }
+  const crawl = await (dependencies.crawl ?? crawlCompany)(input.kit.source.company_url, options.crawl, dependencies.crawlDependencies)
+    .catch(() => fallbackCrawl("Company research could not be completed during regeneration."));
+  const identity = resolveCompanyIdentity({ company_url: input.kit.source.company_url, jd: input.jd, pages: crawl.pages });
+  const discussions = await (dependencies.searchDiscussions ?? searchPublicDiscussions)(
+    { company_url: input.kit.source.company_url, jd: input.jd, pages: crawl.pages },
+    options.discussions,
+    dependencies.discussionDependencies,
+  ).catch(() => fallbackDiscussions("Public-discussion search could not be completed during regeneration."));
+  const generated = await generateCompanyBrief({ identity, pages: crawl.pages, discussions: discussions.evidence }, provider);
+  return { type: "company-brief", companyBrief: generated.brief };
+}

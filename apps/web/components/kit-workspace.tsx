@@ -1,11 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   formatDate,
   readApiError,
   stageLabel,
   type OwnedKit,
+  type PublicRegeneration,
   type Question,
   type Requirement,
 } from "@/lib/api-types";
@@ -20,6 +21,48 @@ const requirementKinds: Requirement["kind"][] = ["technical", "behavioural", "do
 
 function copyContent(content: KitContent): KitContent {
   return structuredClone(content);
+}
+
+function same(left: unknown, right: unknown): boolean {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function rebaseCollection<T extends { id: string }>(base: T[], local: T[], remote: T[]): T[] {
+  if (same(base, local)) return remote;
+  const baseById = new Map(base.map((item) => [item.id, item]));
+  const localById = new Map(local.map((item) => [item.id, item]));
+  const deleted = new Set(base.filter(({ id }) => !localById.has(id)).map(({ id }) => id));
+  const result = remote.filter(({ id }) => !deleted.has(id)).map((item) => {
+    const localItem = localById.get(item.id);
+    const baseItem = baseById.get(item.id);
+    return localItem && (!baseItem || !same(baseItem, localItem)) ? structuredClone(localItem) : item;
+  });
+  const resultIds = new Set(result.map(({ id }) => id));
+  for (const item of local) if (!resultIds.has(item.id)) result.push(structuredClone(item));
+  const baseOrder = base.map(({ id }) => id).filter((id) => localById.has(id));
+  const localOrder = local.map(({ id }) => id).filter((id) => baseById.has(id));
+  if (!same(baseOrder, localOrder)) {
+    const rank = new Map(local.map(({ id }, index) => [id, index]));
+    result.sort((left, right) => (rank.get(left.id) ?? Number.MAX_SAFE_INTEGER) - (rank.get(right.id) ?? Number.MAX_SAFE_INTEGER));
+  }
+  return result;
+}
+
+function rebaseLocalDraft(base: KitContent, local: KitContent, remote: KitContent): KitContent {
+  const next = copyContent(remote);
+  if (base.source.company !== local.source.company) next.source.company = local.source.company;
+  if (base.source.role !== local.source.role) next.source.role = local.source.role;
+  if (base.source.location !== local.source.location) next.source.location = local.source.location;
+  if (base.company_brief.summary !== local.company_brief.summary) next.company_brief.summary = local.company_brief.summary;
+  if (base.company_brief.what_they_do !== local.company_brief.what_they_do) next.company_brief.what_they_do = local.company_brief.what_they_do;
+  if (base.role.title !== local.role.title) next.role.title = local.role.title;
+  if (base.role.seniority !== local.role.seniority) next.role.seniority = local.role.seniority;
+  if (!same(base.role.responsibilities, local.role.responsibilities)) next.role.responsibilities = structuredClone(local.role.responsibilities);
+  next.role.requirements = rebaseCollection(base.role.requirements, local.role.requirements, remote.role.requirements);
+  next.questions = rebaseCollection(base.questions, local.questions, remote.questions);
+  next.flashcards = rebaseCollection(base.flashcards, local.flashcards, remote.flashcards);
+  if (!same(base.schedule, local.schedule)) next.schedule = structuredClone(local.schedule);
+  return next;
 }
 
 function manualId(prefix: string): string {
@@ -68,6 +111,12 @@ export function KitWorkspace({ kitId }: { kitId: string }) {
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [saveMessage, setSaveMessage] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [pinnedQuestionIds, setPinnedQuestionIds] = useState<string[]>([]);
+  const [regenerating, setRegenerating] = useState<string | null>(null);
+  const [regenerationMessage, setRegenerationMessage] = useState("");
+  const dirtyRef = useRef(false);
+  const draftRef = useRef<KitContent | null>(null);
+  const pinsRef = useRef<string[]>([]);
 
   const load = useCallback(async (signal?: AbortSignal) => {
     if (!session) return;
@@ -80,6 +129,7 @@ export function KitWorkspace({ kitId }: { kitId: string }) {
       const body = await response.json() as { kit: OwnedKit };
       setKit(body.kit);
       setDraft(copyContent(body.kit.content));
+      setPinnedQuestionIds(Object.entries(body.kit.metadata.questions).filter(([, value]) => value.pinned).map(([id]) => id));
       setError(null);
       setSaveState("idle");
       setSaveMessage("");
@@ -99,7 +149,16 @@ export function KitWorkspace({ kitId }: { kitId: string }) {
     };
   }, [load, session]);
 
-  const dirty = useMemo(() => Boolean(kit && draft && JSON.stringify(kit.content) !== JSON.stringify(draft)), [draft, kit]);
+  const pinDirty = useMemo(() => {
+    if (!kit) return false;
+    const saved = Object.entries(kit.metadata.questions).filter(([, value]) => value.pinned).map(([id]) => id).sort();
+    return JSON.stringify(saved) !== JSON.stringify([...pinnedQuestionIds].sort());
+  }, [kit, pinnedQuestionIds]);
+  const dirty = useMemo(() => Boolean(kit && draft && (JSON.stringify(kit.content) !== JSON.stringify(draft) || pinDirty)), [draft, kit, pinDirty]);
+
+  useEffect(() => { dirtyRef.current = dirty; }, [dirty]);
+  useEffect(() => { draftRef.current = draft; }, [draft]);
+  useEffect(() => { pinsRef.current = pinnedQuestionIds; }, [pinnedQuestionIds]);
 
   useEffect(() => {
     if (!dirty) return;
@@ -131,6 +190,7 @@ export function KitWorkspace({ kitId }: { kitId: string }) {
   function startEditing() {
     if (!kit) return;
     setDraft(copyContent(kit.content));
+    setPinnedQuestionIds(Object.entries(kit.metadata.questions).filter(([, value]) => value.pinned).map(([id]) => id));
     setEditing(true);
     setSaveState("idle");
     setSaveMessage("");
@@ -139,6 +199,7 @@ export function KitWorkspace({ kitId }: { kitId: string }) {
   function discardEdits() {
     if (!kit || (dirty && !window.confirm("Discard all unsaved edits?"))) return;
     setDraft(copyContent(kit.content));
+    setPinnedQuestionIds(Object.entries(kit.metadata.questions).filter(([, value]) => value.pinned).map(([id]) => id));
     setEditing(false);
     setSaveState("idle");
     setSaveMessage("");
@@ -153,7 +214,7 @@ export function KitWorkspace({ kitId }: { kitId: string }) {
         method: "PATCH",
         credentials: "include",
         headers: { "Content-Type": "application/json", "X-CSRF-Token": session.csrfToken },
-        body: JSON.stringify({ revision: kit.revision, content: draft }),
+        body: JSON.stringify({ revision: kit.revision, content: draft, pinned_question_ids: pinnedQuestionIds }),
       });
       if (!response.ok) {
         const apiError = await readApiError(response, "Your changes could not be saved.");
@@ -163,12 +224,62 @@ export function KitWorkspace({ kitId }: { kitId: string }) {
       const body = await response.json() as { kit: OwnedKit };
       setKit(body.kit);
       setDraft(copyContent(body.kit.content));
+      setPinnedQuestionIds(Object.entries(body.kit.metadata.questions).filter(([, value]) => value.pinned).map(([id]) => id));
       setSaveState("saved");
       setSaveMessage(`Saved revision ${body.kit.revision}.`);
     } catch (caught) {
       const message = caught instanceof Error && caught.message ? caught.message : "Your changes could not be saved.";
       setSaveMessage(message);
       setSaveState((current) => current === "conflict" ? current : "error");
+    }
+  }
+
+  async function regenerate(target: PublicRegeneration["target"]) {
+    if (!session || !kit || dirty || regenerating) return;
+    const key = target.type === "question-category" ? target.category : target.type;
+    const baseDraft = copyContent(draft!);
+    const basePins = [...pinnedQuestionIds];
+    setRegenerating(key);
+    setRegenerationMessage(`Regenerating ${stageLabel(key)}… You can keep editing; save those edits while this runs so the merge can protect them.`);
+    try {
+      const response = await fetch(`/api/v1/kits/${encodeURIComponent(kit.id)}/regenerate`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json", "X-CSRF-Token": session.csrfToken },
+        body: JSON.stringify(target),
+      });
+      if (!response.ok) throw new Error((await readApiError(response, "Regeneration could not start."))?.message);
+      let job = (await response.json() as { regeneration: PublicRegeneration }).regeneration;
+      for (let attempt = 0; attempt < 900 && (job.status === "queued" || job.status === "running"); attempt += 1) {
+        await new Promise((resolve) => window.setTimeout(resolve, 1_000));
+        const statusResponse = await fetch(`/api/v1/regenerations/${encodeURIComponent(job.id)}`, { credentials: "include" });
+        if (!statusResponse.ok) throw new Error((await readApiError(statusResponse, "Regeneration status could not be loaded."))?.message);
+        job = (await statusResponse.json() as { regeneration: PublicRegeneration }).regeneration;
+      }
+      if (job.status !== "completed") throw new Error(job.error?.message ?? "Regeneration did not finish in time.");
+      const kitResponse = await fetch(`/api/v1/kits/${encodeURIComponent(kit.id)}`, { credentials: "include" });
+      if (!kitResponse.ok) throw new Error((await readApiError(kitResponse, "The merged kit could not be loaded."))?.message);
+      const mergedKit = (await kitResponse.json() as { kit: OwnedKit }).kit;
+      const remotePins = Object.entries(mergedKit.metadata.questions).filter(([, value]) => value.pinned).map(([id]) => id);
+      if (dirtyRef.current && draftRef.current) {
+        const rebased = rebaseLocalDraft(baseDraft, draftRef.current, mergedKit.content);
+        const localPinsChanged = !same([...basePins].sort(), [...pinsRef.current].sort());
+        setKit(mergedKit);
+        setDraft(rebased);
+        setPinnedQuestionIds(localPinsChanged ? pinsRef.current : remotePins);
+        setSaveState("idle");
+        setSaveMessage("");
+        setRegenerationMessage(`${stageLabel(key)} merged. Your newer local edits were preserved on top; review and save them.`);
+      } else {
+        setKit(mergedKit);
+        setDraft(copyContent(mergedKit.content));
+        setPinnedQuestionIds(remotePins);
+        setRegenerationMessage(`${stageLabel(key)} regenerated and safely merged.`);
+      }
+    } catch (caught) {
+      setRegenerationMessage(caught instanceof Error && caught.message ? caught.message : "Regeneration failed.");
+    } finally {
+      setRegenerating(null);
     }
   }
 
@@ -240,10 +351,11 @@ export function KitWorkspace({ kitId }: { kitId: string }) {
           <div aria-live="polite"><strong>{editing ? (dirty ? "Unsaved changes" : "Editing revision is up to date") : `Revision ${kit?.revision ?? 1}`}</strong><span className={`save-message save-message--${saveState}`}>{saveMessage || (editing ? "Changes stay local until you save." : "Open edit mode to customize this kit.")}</span></div>
           <div className="editor-toolbar__actions">{editing ? <><button className="secondary-button" type="button" onClick={discardEdits} disabled={saveState === "saving"}>Done</button><button className="primary-button button-with-spinner" type="button" onClick={() => void save()} disabled={!dirty || saveState === "saving"}>{saveState === "saving" && <InlineSpinner />}{saveState === "saving" ? "Saving…" : "Save changes"}</button></> : <button className="primary-button" type="button" onClick={startEditing}>Edit kit</button>}</div>
           {saveState === "conflict" && <button className="text-link editor-reload" type="button" onClick={() => void load()}>Discard local edits and load latest revision</button>}
+          {regenerationMessage && <p className="editor-note" aria-live="polite">{regenerating && <InlineSpinner />} {regenerationMessage}</p>}
         </div>
 
         <section className="kit-section company-section" id="company" aria-labelledby="company-heading">
-          <div className="section-number">01</div><div><p className="eyebrow">Company brief</p><h2 id="company-heading">Know the context.</h2>
+          <div className="section-number">01</div><div><p className="eyebrow">Company brief</p><div className="editor-heading"><h2 id="company-heading">Know the context.</h2><button className="small-button button-with-spinner" type="button" disabled={dirty || Boolean(regenerating)} onClick={() => void regenerate({ type: "company-brief" })}>{regenerating === "company-brief" && <InlineSpinner />}{regenerating === "company-brief" ? "Regenerating…" : "Regenerate brief"}</button></div>
             {editing ? <div className="editor-stack"><label className="editor-field"><span>Summary</span><textarea rows={4} value={draft.company_brief.summary} onChange={(event) => updateDraft((next) => { next.company_brief.summary = event.target.value; })} /></label><label className="editor-field"><span>What they do</span><textarea rows={5} value={draft.company_brief.what_they_do} onChange={(event) => updateDraft((next) => { next.company_brief.what_they_do = event.target.value; })} /></label></div> : <><p className="section-lede">{draft.company_brief.summary || "No reliable company summary was available."}</p>{draft.company_brief.what_they_do && <p>{draft.company_brief.what_they_do}</p>}</>}
           </div>
         </section>
@@ -260,9 +372,10 @@ export function KitWorkspace({ kitId }: { kitId: string }) {
         <section className="kit-section" id="questions" aria-labelledby="questions-heading">
           <div className="section-number">03</div><div><p className="eyebrow">Interview questions</p><h2 id="questions-heading">Practise the thinking, not a script.</h2>
             {editing && <div className="editor-heading editor-heading--top"><p>Add questions to any category, then use the controls to move or reorder them.</p><button className="small-button" type="button" onClick={() => updateDraft((next) => { next.questions.push({ id: manualId("q"), requirement_ids: [], category: "technical", prompt: "New interview question", answer_outline: "", difficulty: 1 }); })}>Add question</button></div>}
-            <div className="question-groups">{groupedQuestions.map(({ category, questions }) => <section key={category} className="question-group"><h3>{stageLabel(category)} <span>{questions.length}</span></h3>{questions.length === 0 && <p className="section-empty">No questions in this category.</p>}{questions.map((question, index) => {
+            <div className="question-groups">{groupedQuestions.map(({ category, questions }) => <section key={category} className="question-group"><div className="editor-heading"><h3>{stageLabel(category)} <span>{questions.length}</span></h3><button className="small-button button-with-spinner" type="button" disabled={dirty || Boolean(regenerating)} onClick={() => void regenerate({ type: "question-category", category })}>{regenerating === category && <InlineSpinner />}{regenerating === category ? "Regenerating…" : "Regenerate category"}</button></div>{questions.length === 0 && <p className="section-empty">No questions in this category.</p>}{questions.map((question, index) => {
               const actualIndex = draft.questions.findIndex((item) => item.id === question.id);
-              return <article className={`question-card ${editing ? "question-card--editing" : ""}`} key={question.id}><div className="question-number">{String(index + 1).padStart(2, "0")}</div><div>{editing ? <div className="editor-stack"><label className="editor-field"><span>Question prompt</span><textarea rows={3} value={question.prompt} onChange={(event) => updateDraft((next) => { next.questions[actualIndex]!.prompt = event.target.value; })} /></label><label className="editor-field"><span>Answer outline</span><textarea rows={5} value={question.answer_outline} onChange={(event) => updateDraft((next) => { next.questions[actualIndex]!.answer_outline = event.target.value; })} /></label><div className="editor-inline-grid"><label className="editor-field"><span>Category</span><select value={question.category} onChange={(event) => updateDraft((next) => { next.questions[actualIndex]!.category = event.target.value as Question["category"]; })}>{categories.map((value) => <option key={value} value={value}>{stageLabel(value)}</option>)}</select></label><label className="editor-field"><span>Difficulty</span><select value={question.difficulty} onChange={(event) => updateDraft((next) => { next.questions[actualIndex]!.difficulty = Number(event.target.value) as Question["difficulty"]; })}><option value={1}>1 · Foundation</option><option value={2}>2 · Applied</option><option value={3}>3 · Deep dive</option></select></label></div><ReferenceChecks legend="Linked requirements" options={requirementOptions} selected={question.requirement_ids} onChange={(ids) => updateDraft((next) => { next.questions[actualIndex]!.requirement_ids = ids; })} /><div className="item-actions"><button className="small-button" type="button" disabled={index === 0} onClick={() => moveQuestion(question.id, -1)} aria-label={`Move ${question.prompt} earlier in ${stageLabel(category)}`}>Move up</button><button className="small-button" type="button" disabled={index === questions.length - 1} onClick={() => moveQuestion(question.id, 1)} aria-label={`Move ${question.prompt} later in ${stageLabel(category)}`}>Move down</button><button className="danger-button" type="button" onClick={() => removeQuestion(question.id)}>Delete question</button></div></div> : <><h4>{question.prompt}</h4><p className="answer-outline">{question.answer_outline || "Build your answer from the linked role requirements."}</p><div className="tag-row"><span>Difficulty {question.difficulty}</span>{question.requirement_ids.map((id) => <span key={id}>{requirementById.get(id)?.text ?? id}</span>)}</div></>}</div></article>;
+              const pinned = pinnedQuestionIds.includes(question.id);
+              return <article className={`question-card ${editing ? "question-card--editing" : ""}`} key={question.id}><div className="question-number">{String(index + 1).padStart(2, "0")}</div><div>{editing ? <div className="editor-stack"><label className="editor-field"><span>Question prompt</span><textarea rows={3} value={question.prompt} onChange={(event) => updateDraft((next) => { next.questions[actualIndex]!.prompt = event.target.value; })} /></label><label className="editor-field"><span>Answer outline</span><textarea rows={5} value={question.answer_outline} onChange={(event) => updateDraft((next) => { next.questions[actualIndex]!.answer_outline = event.target.value; })} /></label><div className="editor-inline-grid"><label className="editor-field"><span>Category</span><select value={question.category} onChange={(event) => updateDraft((next) => { next.questions[actualIndex]!.category = event.target.value as Question["category"]; })}>{categories.map((value) => <option key={value} value={value}>{stageLabel(value)}</option>)}</select></label><label className="editor-field"><span>Difficulty</span><select value={question.difficulty} onChange={(event) => updateDraft((next) => { next.questions[actualIndex]!.difficulty = Number(event.target.value) as Question["difficulty"]; })}><option value={1}>1 · Foundation</option><option value={2}>2 · Applied</option><option value={3}>3 · Deep dive</option></select></label></div><ReferenceChecks legend="Linked requirements" options={requirementOptions} selected={question.requirement_ids} onChange={(ids) => updateDraft((next) => { next.questions[actualIndex]!.requirement_ids = ids; })} /><div className="item-actions"><button className="small-button" type="button" aria-pressed={pinned} onClick={() => setPinnedQuestionIds((ids) => pinned ? ids.filter((id) => id !== question.id) : [...ids, question.id])}>{pinned ? "Pinned" : "Pin"}</button><button className="small-button" type="button" disabled={index === 0} onClick={() => moveQuestion(question.id, -1)} aria-label={`Move ${question.prompt} earlier in ${stageLabel(category)}`}>Move up</button><button className="small-button" type="button" disabled={index === questions.length - 1} onClick={() => moveQuestion(question.id, 1)} aria-label={`Move ${question.prompt} later in ${stageLabel(category)}`}>Move down</button><button className="danger-button" type="button" onClick={() => removeQuestion(question.id)}>Delete question</button></div></div> : <><div className="tag-row">{pinned && <span>Pinned</span>}</div><h4>{question.prompt}</h4><p className="answer-outline">{question.answer_outline || "Build your answer from the linked role requirements."}</p><div className="tag-row"><span>Difficulty {question.difficulty}</span>{question.requirement_ids.map((id) => <span key={id}>{requirementById.get(id)?.text ?? id}</span>)}</div></>}</div></article>;
             })}</section>)}</div>
             {draft.questions.length === 0 && !editing && <p className="section-empty">No reliable questions could be generated from this input.</p>}
           </div>
@@ -276,7 +389,7 @@ export function KitWorkspace({ kitId }: { kitId: string }) {
         </section>
 
         <section className="kit-section" id="schedule" aria-labelledby="schedule-heading">
-          <div className="section-number">05</div><div><p className="eyebrow">Study schedule</p><h2 id="schedule-heading">A plan for every available day.</h2><ol className="schedule-list">{draft.schedule.days.map((day, index) => <li className={editing ? "schedule-day--editing" : ""} key={day.day}><div className="day-marker"><span>Day</span><strong>{day.day}</strong></div><div>{editing ? <div className="editor-stack"><label className="editor-field"><span>Focus</span><input value={day.focus} onChange={(event) => updateDraft((next) => { next.schedule.days[index]!.focus = event.target.value; })} /></label><ReferenceChecks legend="Assigned questions" options={questionOptions} selected={day.question_ids} onChange={(ids) => updateDraft((next) => { next.schedule.days[index]!.question_ids = ids; })} /></div> : <><h3>{day.focus || "Review and consolidate"}</h3><p>{day.question_ids.length > 0 ? day.question_ids.map((id) => questionById.get(id)?.prompt ?? id).join(" · ") : "No new material scheduled; use this day to review."}</p></>}</div>{editing ? <label className="editor-field editor-field--minutes"><span>Minutes</span><input type="number" inputMode="numeric" min="0" step="1" value={day.minutes} onChange={(event) => updateDraft((next) => { next.schedule.days[index]!.minutes = Math.max(0, Number.parseInt(event.target.value || "0", 10)); })} /></label> : <span className="minutes">{day.minutes} min</span>}</li>)}</ol></div>
+          <div className="section-number">05</div><div><p className="eyebrow">Study schedule</p><div className="editor-heading"><h2 id="schedule-heading">A plan for every available day.</h2><button className="small-button button-with-spinner" type="button" disabled={dirty || Boolean(regenerating)} onClick={() => void regenerate({ type: "schedule" })}>{regenerating === "schedule" && <InlineSpinner />}{regenerating === "schedule" ? "Regenerating…" : "Regenerate schedule"}</button></div><ol className="schedule-list">{draft.schedule.days.map((day, index) => <li className={editing ? "schedule-day--editing" : ""} key={day.day}><div className="day-marker"><span>Day</span><strong>{day.day}</strong></div><div>{editing ? <div className="editor-stack"><label className="editor-field"><span>Focus</span><input value={day.focus} onChange={(event) => updateDraft((next) => { next.schedule.days[index]!.focus = event.target.value; })} /></label><ReferenceChecks legend="Assigned questions" options={questionOptions} selected={day.question_ids} onChange={(ids) => updateDraft((next) => { next.schedule.days[index]!.question_ids = ids; })} /></div> : <><h3>{day.focus || "Review and consolidate"}</h3><p>{day.question_ids.length > 0 ? day.question_ids.map((id) => questionById.get(id)?.prompt ?? id).join(" · ") : "No new material scheduled; use this day to review."}</p></>}</div>{editing ? <label className="editor-field editor-field--minutes"><span>Minutes</span><input type="number" inputMode="numeric" min="0" step="1" value={day.minutes} onChange={(event) => updateDraft((next) => { next.schedule.days[index]!.minutes = Math.max(0, Number.parseInt(event.target.value || "0", 10)); })} /></label> : <span className="minutes">{day.minutes} min</span>}</li>)}</ol></div>
         </section>
 
         <section className="kit-section" id="evidence" aria-labelledby="evidence-heading">

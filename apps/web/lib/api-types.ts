@@ -53,6 +53,13 @@ export type Question = {
 
 export type Flashcard = { id: string; front: string; back: string; requirement_ids: string[] };
 export type ScheduleDay = { day: number; focus: string; question_ids: string[]; minutes: number };
+export type ContentMetadata = {
+  origin: "generated" | "manual";
+  userEdited: boolean;
+  pinned: boolean;
+  revision: number;
+  generationRunId: string | null;
+};
 
 export type OwnedKit = KitSummary & {
   originalInput: { jd: string; companyUrl: string; days: number };
@@ -82,6 +89,28 @@ export type OwnedKit = KitSummary & {
     coverage: { uncovered_requirement_ids: string[]; passes: number };
     warnings?: Array<{ code: string; message: string; url?: string }>;
   };
+  metadata: {
+    companyBrief: ContentMetadata;
+    schedule: ContentMetadata;
+    requirements: Record<string, ContentMetadata>;
+    questions: Record<string, ContentMetadata>;
+    flashcards: Record<string, ContentMetadata>;
+  };
+};
+
+export type PublicRegeneration = {
+  id: string;
+  kitId: string;
+  target:
+    | { type: "company-brief" }
+    | { type: "question-category"; category: Question["category"] }
+    | { type: "schedule" };
+  baseRevision: number;
+  status: "queued" | "running" | "completed" | "failed";
+  error?: { code: string; message: string };
+  createdAt: string;
+  updatedAt: string;
+  completedAt?: string;
 };
 
 export async function readApiError(response: Response, fallback: string): Promise<ApiError["error"]> {

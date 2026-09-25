@@ -5,6 +5,7 @@ import type { AppConfig } from "./config.js";
 import type { Persistence } from "./database.js";
 import { JobError, JobService, publicJob } from "./jobs.js";
 import { KitEditError, KitService, publicKit, publicKitSummary } from "./kits.js";
+import { RegenerationError, RegenerationService, publicRegeneration } from "./regenerations.js";
 
 const DEVELOPMENT_SESSION_COOKIE = "jobber_session";
 const PRODUCTION_SESSION_COOKIE = "__Host-jobber_session";
@@ -59,7 +60,7 @@ function authPayload(session: SessionWithUser) {
 export function createApp(
   config: AppConfig,
   persistence: Persistence,
-  dependencies: { notifyJobAvailable?: () => void } = {},
+  dependencies: { notifyJobAvailable?: () => void; notifyRegenerationAvailable?: () => void } = {},
 ) {
   const app = express();
   const auth = new AuthService(persistence, {
@@ -83,6 +84,7 @@ export function createApp(
     maxAttempts: config.jobMaxAttempts,
   });
   const kits = new KitService(persistence);
+  const regenerations = new RegenerationService(persistence);
 
   const requireMutationOrigin = (request: Request): void => {
     const origin = request.header("origin");
@@ -130,7 +132,7 @@ export function createApp(
     next();
   });
   app.use(express.json({ limit: "1mb" }));
-  app.use(["/api/v1/auth", "/api/v1/account", "/api/v1/jobs", "/api/v1/kits"], (_request, response, next) => {
+  app.use(["/api/v1/auth", "/api/v1/account", "/api/v1/jobs", "/api/v1/kits", "/api/v1/regenerations"], (_request, response, next) => {
     response.setHeader("Cache-Control", "no-store");
     next();
   });
@@ -250,6 +252,22 @@ export function createApp(
     response.json({ kit: publicKit(kit) });
   });
 
+  app.post("/api/v1/kits/:kitId/regenerate", async (request, response) => {
+    requireMutationOrigin(request);
+    const session = await resolveAuthenticatedSession(request, response);
+    auth.verifyCsrf(session, request.header("x-csrf-token"));
+    const job = await regenerations.enqueue(session.user.id, request.params.kitId, request.body);
+    dependencies.notifyRegenerationAvailable?.();
+    response.setHeader("Location", `/api/v1/regenerations/${job.id}`);
+    response.status(202).json({ regeneration: publicRegeneration(job) });
+  });
+
+  app.get("/api/v1/regenerations/:jobId", async (request, response) => {
+    const session = await resolveAuthenticatedSession(request, response);
+    const job = await regenerations.getOwned(session.user.id, request.params.jobId);
+    response.json({ regeneration: publicRegeneration(job) });
+  });
+
   app.get("/api/v1/jobs", async (request, response) => {
     const session = await resolveAuthenticatedSession(request, response);
     const ownedJobs = await jobs.listOwned(session.user.id);
@@ -312,6 +330,10 @@ export function createApp(
           ...(error.options.revision !== undefined ? { details: { revision: error.options.revision } } : {}),
         },
       });
+      return;
+    }
+    if (error instanceof RegenerationError) {
+      response.status(error.status).json({ error: { code: error.code, message: error.message } });
       return;
     }
     if (error instanceof SyntaxError && "status" in error && error.status === 400) {

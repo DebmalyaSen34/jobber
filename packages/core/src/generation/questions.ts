@@ -360,6 +360,47 @@ export type GenerateQuestionsOptions = {
   maxOutputTokens?: number;
 };
 
+export async function generateQuestionCategory(
+  requirements: readonly Requirement[],
+  category: QuestionCategory,
+  provider: JsonProvider,
+  options: Pick<GenerateQuestionsOptions, "context" | "maxOutputTokens"> = {},
+): Promise<QuestionGenerationResult> {
+  const parsedRequirements = z.array(requirementSchema).parse(requirements);
+  assertUniqueIds(parsedRequirements, "requirement");
+  const batch = routeRequirements(parsedRequirements, options.context ?? {})[category];
+  if (batch.length === 0) {
+    return { questions: [], coverage: checkCoverage(parsedRequirements, []), passes: 1, warnings: [], trace: [] };
+  }
+  const result = await provider.generateJson({
+    stage: category,
+    system: `${baseSystem()} ${categoryInstruction(category)}`,
+    prompt: JSON.stringify({
+      task: `Regenerate only the ${category} interview question category for this requirement batch.`,
+      requirements: requirementPayload(batch),
+      context: compactContext(options.context ?? {}),
+    }),
+    schema: questionJsonSchema,
+    temperature: 0.2,
+    maxOutputTokens: options.maxOutputTokens ?? 4_096,
+    validate: (value) => validateQuestionResponse(value, new Set(batch.map(({ id }) => id)), category),
+  });
+  const parsed = parseProviderQuestions(result, questionResponseSchema);
+  const questions: Question[] = [];
+  const added = appendQuestions(
+    questions,
+    parsed.questions.map((question) => ({ ...question, category })),
+    new Set(batch.map(({ id }) => id)),
+  );
+  return {
+    questions,
+    coverage: checkCoverage(parsedRequirements, questions),
+    passes: 1,
+    warnings: [],
+    trace: [traceProviderCall(result, category, 1, batch.map(({ id }) => id), added, [])],
+  };
+}
+
 export async function generateQuestionsWithCoverage(
   requirements: readonly Requirement[],
   provider: JsonProvider,

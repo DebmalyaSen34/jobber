@@ -11,9 +11,17 @@ import type {
   JobStatus,
   JobStore,
 } from "./jobs.js";
-import type { KitStore, OwnedKit } from "./kits.js";
+import {
+  initialKitMetadata,
+  normalizeKitMetadata,
+  type ContentTombstone,
+  type KitContentMetadata,
+  type KitStore,
+  type OwnedKit,
+} from "./kits.js";
+import type { ClaimedRegeneration, RegenerationJob, RegenerationStore } from "./regenerations.js";
 
-export interface Persistence extends AuthStore, JobStore, KitStore {
+export interface Persistence extends AuthStore, JobStore, KitStore, RegenerationStore {
   connect(): Promise<void>;
   ping(): Promise<void>;
   close(): Promise<void>;
@@ -83,10 +91,40 @@ type KitRecord = {
   source_job_id: ObjectId;
   original_input: JobInput;
   content: Kit;
+  metadata?: KitContentMetadata;
+  tombstones?: ContentTombstone[];
   revision: number;
   created_at: Date;
   updated_at: Date;
 };
+
+type RegenerationRecord = {
+  _id: ObjectId;
+  owner_id: ObjectId;
+  kit_id: ObjectId;
+  target: RegenerationJob["target"];
+  base_revision: number;
+  status: RegenerationJob["status"];
+  lease_token?: string;
+  lease_owner?: string;
+  lease_expires_at?: Date;
+  error?: RegenerationJob["error"];
+  created_at: Date;
+  updated_at: Date;
+  completed_at?: Date;
+};
+
+function toRegenerationJob(record: RegenerationRecord): RegenerationJob {
+  return {
+    id: record._id.toHexString(), ownerId: record.owner_id.toHexString(), kitId: record.kit_id.toHexString(),
+    target: record.target, baseRevision: record.base_revision, status: record.status,
+    ...(record.lease_token ? { leaseToken: record.lease_token } : {}),
+    ...(record.lease_expires_at ? { leaseExpiresAt: record.lease_expires_at } : {}),
+    ...(record.error ? { error: record.error } : {}),
+    createdAt: record.created_at, updatedAt: record.updated_at,
+    ...(record.completed_at ? { completedAt: record.completed_at } : {}),
+  };
+}
 
 function toAuthUser(record: UserRecord): AuthUser {
   return {
@@ -131,6 +169,8 @@ function toOwnedKit(record: KitRecord): OwnedKit {
     sourceJobId: record.source_job_id.toHexString(),
     originalInput: record.original_input,
     content: record.content,
+    metadata: normalizeKitMetadata(record.content, record.metadata, record.source_job_id.toHexString(), record.revision),
+    tombstones: record.tombstones ?? [],
     revision: record.revision,
     createdAt: record.created_at,
     updatedAt: record.updated_at,
@@ -160,6 +200,7 @@ export class MongoPersistence implements Persistence {
   private readonly rateLimits: Collection<RateLimitRecord>;
   private readonly jobs: Collection<JobRecord>;
   private readonly kits: Collection<KitRecord>;
+  private readonly regenerations: Collection<RegenerationRecord>;
   private readonly instanceId = randomUUID();
 
   constructor(uri: string, databaseName: string, connectTimeoutMs: number, private readonly release: string) {
@@ -175,6 +216,7 @@ export class MongoPersistence implements Persistence {
     this.rateLimits = this.database.collection<RateLimitRecord>("auth_rate_limits");
     this.jobs = this.database.collection<JobRecord>("generation_jobs");
     this.kits = this.database.collection<KitRecord>("kits");
+    this.regenerations = this.database.collection<RegenerationRecord>("regeneration_jobs");
   }
 
   async connect(): Promise<void> {
@@ -207,6 +249,8 @@ export class MongoPersistence implements Persistence {
       ),
       this.jobs.createIndex({ owner_id: 1, created_at: -1 }, { name: "jobs_by_owner" }),
       this.kits.createIndex({ owner_id: 1, updated_at: -1 }, { name: "kits_by_owner" }),
+      this.regenerations.createIndex({ status: 1, lease_expires_at: 1, created_at: 1 }, { name: "claimable_regenerations" }),
+      this.regenerations.createIndex({ owner_id: 1, kit_id: 1, created_at: -1 }, { name: "regenerations_by_kit" }),
     ]);
   }
 
@@ -407,6 +451,8 @@ export class MongoPersistence implements Persistence {
     kitId: string;
     expectedRevision: number;
     content: Kit;
+    metadata: KitContentMetadata;
+    tombstones: ContentTombstone[];
     now: Date;
   }): Promise<{ kind: "updated"; kit: OwnedKit } | { kind: "not_found" } | { kind: "conflict"; revision: number }> {
     if (!ObjectId.isValid(input.ownerId) || !ObjectId.isValid(input.kitId)) return { kind: "not_found" };
@@ -414,12 +460,98 @@ export class MongoPersistence implements Persistence {
     const ownerId = new ObjectId(input.ownerId);
     const record = await this.kits.findOneAndUpdate(
       { _id: id, owner_id: ownerId, revision: input.expectedRevision },
-      { $set: { content: input.content, updated_at: input.now }, $inc: { revision: 1 } },
+      {
+        $set: {
+          content: input.content,
+          metadata: input.metadata,
+          tombstones: input.tombstones,
+          updated_at: input.now,
+        },
+        $inc: { revision: 1 },
+      },
       { returnDocument: "after" },
     );
     if (record) return { kind: "updated", kit: toOwnedKit(record) };
     const current = await this.kits.findOne({ _id: id, owner_id: ownerId }, { projection: { revision: 1 } });
     return current ? { kind: "conflict", revision: current.revision } : { kind: "not_found" };
+  }
+
+  async enqueueRegeneration(input: {
+    ownerId: string; kitId: string; target: RegenerationJob["target"]; baseRevision: number; now: Date;
+  }): Promise<RegenerationJob> {
+    const record: RegenerationRecord = {
+      _id: new ObjectId(), owner_id: new ObjectId(input.ownerId), kit_id: new ObjectId(input.kitId),
+      target: input.target, base_revision: input.baseRevision, status: "queued",
+      created_at: input.now, updated_at: input.now,
+    };
+    await this.regenerations.insertOne(record);
+    return toRegenerationJob(record);
+  }
+
+  async findOwnedRegeneration(ownerId: string, jobId: string): Promise<RegenerationJob | null> {
+    if (!ObjectId.isValid(ownerId) || !ObjectId.isValid(jobId)) return null;
+    const record = await this.regenerations.findOne({ _id: new ObjectId(jobId), owner_id: new ObjectId(ownerId) });
+    return record ? toRegenerationJob(record) : null;
+  }
+
+  async claimNextRegeneration(workerId: string, now: Date, leaseMs: number): Promise<ClaimedRegeneration | null> {
+    const leaseToken = randomUUID();
+    const leaseExpiresAt = new Date(now.getTime() + leaseMs);
+    const record = await this.regenerations.findOneAndUpdate(
+      { $or: [{ status: "queued" }, { status: "running", lease_expires_at: { $lte: now } }] },
+      {
+        $set: { status: "running", lease_token: leaseToken, lease_owner: workerId, lease_expires_at: leaseExpiresAt, updated_at: now },
+        $unset: { error: "" },
+      },
+      { sort: { created_at: 1 }, returnDocument: "after" },
+    );
+    if (!record) return null;
+    return { ...toRegenerationJob(record), status: "running", leaseToken, leaseExpiresAt };
+  }
+
+  async renewRegenerationLease(jobId: string, leaseToken: string, now: Date, leaseMs: number): Promise<boolean> {
+    if (!ObjectId.isValid(jobId)) return false;
+    const result = await this.regenerations.updateOne(
+      { _id: new ObjectId(jobId), status: "running", lease_token: leaseToken, lease_expires_at: { $gt: now } },
+      { $set: { lease_expires_at: new Date(now.getTime() + leaseMs), updated_at: now } },
+    );
+    return result.modifiedCount === 1;
+  }
+
+  async completeRegeneration(jobId: string, leaseToken: string, now: Date): Promise<boolean> {
+    if (!ObjectId.isValid(jobId)) return false;
+    const result = await this.regenerations.updateOne(
+      { _id: new ObjectId(jobId), status: "running", lease_token: leaseToken },
+      {
+        $set: { status: "completed", completed_at: now, updated_at: now },
+        $unset: { lease_token: "", lease_owner: "", lease_expires_at: "", error: "" },
+      },
+    );
+    return result.modifiedCount === 1;
+  }
+
+  async failRegeneration(jobId: string, leaseToken: string, error: { code: string; message: string }, now: Date): Promise<boolean> {
+    if (!ObjectId.isValid(jobId)) return false;
+    const result = await this.regenerations.updateOne(
+      { _id: new ObjectId(jobId), status: "running", lease_token: leaseToken },
+      {
+        $set: { status: "failed", error, updated_at: now },
+        $unset: { lease_token: "", lease_owner: "", lease_expires_at: "" },
+      },
+    );
+    return result.modifiedCount === 1;
+  }
+
+  async releaseRegeneration(jobId: string, leaseToken: string, now: Date): Promise<boolean> {
+    if (!ObjectId.isValid(jobId)) return false;
+    const result = await this.regenerations.updateOne(
+      { _id: new ObjectId(jobId), status: "running", lease_token: leaseToken },
+      {
+        $set: { status: "queued", updated_at: now },
+        $unset: { lease_token: "", lease_owner: "", lease_expires_at: "" },
+      },
+    );
+    return result.modifiedCount === 1;
   }
 
   async claimNextJob(workerId: string, now: Date, leaseMs: number): Promise<ClaimedJob | null> {
@@ -648,6 +780,8 @@ export class MongoPersistence implements Persistence {
           source_job_id: record._id,
           original_input: record.input,
           content: record.result,
+          metadata: initialKitMetadata(record.result, record._id.toHexString()),
+          tombstones: [],
           revision: 1,
           created_at: record.completed_at ?? record.updated_at,
           updated_at: record.completed_at ?? record.updated_at,

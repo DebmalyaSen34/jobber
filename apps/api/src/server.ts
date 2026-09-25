@@ -1,9 +1,10 @@
 import { createServer } from "node:http";
-import { generateKit } from "@jobber/core";
+import { generateKit, regenerateKitSection } from "@jobber/core";
 import { createApp } from "./app.js";
 import { loadConfig } from "./config.js";
 import { MongoPersistence } from "./database.js";
 import { createWorkerId, JobRunner } from "./jobs.js";
+import { RegenerationRunner } from "./regenerations.js";
 
 async function main(): Promise<void> {
   const config = loadConfig();
@@ -22,10 +23,19 @@ async function main(): Promise<void> {
     pollMs: config.jobPollMs,
     retryBaseMs: config.jobRetryBaseMs,
   });
-  const server = createServer(createApp(config, persistence, { notifyJobAvailable: () => runner.wake() }));
+  const regenerationRunner = new RegenerationRunner(persistence, regenerateKitSection, {
+    workerId: createWorkerId(`${config.release}:regeneration`),
+    leaseMs: config.jobLeaseMs,
+    pollMs: config.jobPollMs,
+  });
+  const server = createServer(createApp(config, persistence, {
+    notifyJobAvailable: () => runner.wake(),
+    notifyRegenerationAvailable: () => regenerationRunner.wake(),
+  }));
   server.listen(config.port, "0.0.0.0", () => {
     console.info(`jobber-api listening on port ${config.port} (${config.release})`);
     runner.start();
+    regenerationRunner.start();
   });
 
   let shuttingDown = false;
@@ -34,6 +44,7 @@ async function main(): Promise<void> {
     shuttingDown = true;
     console.info(`jobber-api received ${signal}; shutting down`);
     await runner.stop();
+    await regenerationRunner.stop();
 
     const timeout = setTimeout(() => {
       console.error("jobber-api shutdown grace period expired");

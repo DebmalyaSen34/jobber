@@ -1,6 +1,6 @@
 # Kit editing
 
-M4 task 1 adds durable, owner-scoped editing to completed kits.
+M4 tasks 1–2 add durable, owner-scoped editing and safe section regeneration to completed kits.
 
 ## Interaction model
 
@@ -22,13 +22,25 @@ The mutation requires the authenticated owner, trusted origin, and session CSRF 
 5. Runs relational validation in draft mode. Intentional coverage or scheduling gaps are warnings; malformed structure and dangling references are rejected.
 6. Atomically updates only when the stored revision equals the submitted revision, then increments it.
 
-A stale revision returns `409 KIT_REVISION_CONFLICT`. The browser keeps its local draft and offers an explicit action to discard it and load the latest server revision. Full entity metadata, deletion tombstones, and regeneration-safe merging are M4 task 2.
+A stale revision returns `409 KIT_REVISION_CONFLICT`. The browser keeps its local draft and offers an explicit action to discard it and load the latest server revision.
 
 Deleting a requirement removes its links from questions and flashcards. Deleting a question removes its schedule assignments. These immediate reconciliations keep user-driven mutations structurally valid; broader derived-state repair remains M4 task 3.
 
+## Metadata and safe regeneration
+
+Kit documents keep metadata outside the public `Kit` contract for the company brief, schedule, requirements, questions, and flashcards. Every entry records generated/manual origin, whether a user changed it, pin state, its last changed kit revision, and the generation run that created it. Saves derive this state server-side; clients may only submit the set of pinned question IDs. Deletions append durable requirement/question/flashcard tombstones.
+
+Older kits without metadata remain readable. Revision-one kits receive generated defaults. For an older kit already saved at a later revision, existing content is conservatively treated as user-edited so a later regeneration cannot overwrite work created before metadata existed.
+
+`POST /api/v1/kits/:kitId/regenerate` accepts one target: `company-brief`, `question-category` plus its category, or `schedule`. It records a Mongo-backed regeneration job and the kit's base revision, then returns `202`. `GET /api/v1/regenerations/:jobId` is owner-scoped progress polling.
+
+The worker uses an expiring fenced lease. After generation it reloads the latest kit, merges only the requested target, protects manual/edited/pinned content and entities changed after the recorded base revision, excludes every tombstoned ID, removes stale schedule question references, recomputes coverage, validates the draft, and commits with an atomic kit-revision predicate. A racing save causes up to three latest-state merge retries; it never overwrites the stale snapshot. Preserved entities keep their IDs and explicit order; newly generated entities receive application-generated IDs.
+
+Regeneration controls require the initial local draft to be saved, but editing remains available while the background job runs. An edit saved during generation becomes part of the server's latest-state merge. If edits are still local when the job completes, the browser rebases those entity-level changes onto the merged server revision and leaves them unsaved for review instead of replacing them.
+
 ## Verification
 
-- The network-free repository check covers lint, TypeScript, 61 core tests, 16 API tests, nine CLI tests, and five fixture tests.
+- The network-free acceptance test starts a category regeneration, applies an edit while generation is blocked, and verifies edited Q1, pinned Q2, manual Q3, and concurrent Q5 survive; deleted Q4 remains absent; unrelated content and all references remain valid.
 - The loopback API suite verifies an authenticated successful edit, coverage recomputation, revision increment, stale-save conflict, and cross-owner 404.
 - The webpack production frontend build passes.
 - A local browser smoke with a temporary mock session verified view/edit states, accessible labels and controls, local dirty state, successful save feedback/revision increment, and question addition without a framework error overlay.
