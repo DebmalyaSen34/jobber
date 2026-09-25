@@ -1,3 +1,5 @@
+import { RouteLoading } from "@/components/loading-state";
+
 export default function Loading() {
-  return <div className="dashboard-state" aria-live="polite">Opening generation progress…</div>;
+  return <RouteLoading label="Opening generation progress…" />;
 }

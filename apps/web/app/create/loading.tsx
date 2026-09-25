@@ -1,5 +1,5 @@
 import { RouteLoading } from "@/components/loading-state";
 
 export default function Loading() {
-  return <RouteLoading label="Opening your preparation kit…" />;
+  return <RouteLoading label="Preparing kit creation…" />;
 }

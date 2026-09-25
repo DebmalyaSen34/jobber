@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { type ChangeEvent, type FormEvent, useEffect, useState } from "react";
 import { readApiError, type PublicJob } from "@/lib/api-types";
 import { useSession } from "@/lib/use-session";
+import { InlineSpinner, LoadingState, TransitionOverlay } from "./loading-state";
 import { WorkspaceHeader } from "./workspace-header";
 
 const DRAFT_KEY = "jobber:create-draft:v1";
@@ -41,6 +42,7 @@ export function CreateKit() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [manualStatus, setManualStatus] = useState<"queuing" | "redirecting" | null>(null);
   const [uploadName, setUploadName] = useState("");
   const [uploadRows, setUploadRows] = useState<unknown[] | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -78,8 +80,14 @@ export function CreateKit() {
     if (!session) return;
     const nextErrors = validate(fields);
     setErrors(nextErrors);
-    if (Object.keys(nextErrors).length > 0) return;
+    const firstError = Object.keys(nextErrors)[0];
+    if (firstError) {
+      const fieldId = firstError === "company_url" ? "company-url" : firstError;
+      window.requestAnimationFrame(() => document.getElementById(fieldId)?.focus());
+      return;
+    }
     setSubmitting(true);
+    setManualStatus("queuing");
     setFormError(null);
     try {
       const response = await fetch("/api/v1/kits", {
@@ -90,15 +98,24 @@ export function CreateKit() {
       });
       if (!response.ok) {
         const error = await readApiError(response, "The kit could not be queued.");
-        setErrors(error?.fields ?? {});
+        const responseFields = error?.fields ?? {};
+        setErrors(responseFields);
+        const firstField = Object.keys(responseFields)[0];
+        if (firstField) {
+          const fieldId = firstField === "company_url" ? "company-url" : firstField;
+          window.requestAnimationFrame(() => document.getElementById(fieldId)?.focus());
+        }
         throw new Error(error?.message);
       }
       const body = await response.json() as { job: PublicJob; deduplicated: boolean };
       window.localStorage.removeItem(DRAFT_KEY);
+      setManualStatus("redirecting");
+      await new Promise((resolve) => window.setTimeout(resolve, 350));
       router.push(`/jobs/${body.job.id}${body.deduplicated ? "?duplicate=1" : ""}`);
     } catch (caught) {
       setFormError(caught instanceof Error && caught.message ? caught.message : "The kit could not be queued. Please try again.");
       setSubmitting(false);
+      setManualStatus(null);
     }
   }
 
@@ -158,18 +175,25 @@ export function CreateKit() {
         </header>
 
         {sessionError && <div className="dashboard-state dashboard-state--error" role="alert"><span>{sessionError}</span><button className="secondary-button" onClick={retry} type="button">Retry</button></div>}
-        {!session && !sessionError && <div className="dashboard-state" aria-live="polite">Preparing the form…</div>}
+        {!session && !sessionError && <LoadingState label="Preparing the form…" detail="Confirming your private session." />}
 
         {session && (
           <section className="create-card" aria-labelledby="create-mode-heading">
+            {manualStatus && (
+              <TransitionOverlay
+                confirmed={manualStatus === "redirecting"}
+                title={manualStatus === "redirecting" ? "Kit queued." : "Starting your kit…"}
+                detail={manualStatus === "redirecting" ? "Opening live generation progress now…" : "Validating the role and creating a durable generation job."}
+              />
+            )}
             <h2 className="sr-only" id="create-mode-heading">Choose how to create kits</h2>
-            <div className="mode-switch" role="group" aria-label="Creation method">
+            <div className="mode-switch" role="group" aria-label="Creation method" inert={Boolean(manualStatus)}>
               <button type="button" aria-pressed={mode === "manual"} onClick={() => setMode("manual")}>One role</button>
               <button type="button" aria-pressed={mode === "upload"} onClick={() => setMode("upload")}>JSON upload</button>
             </div>
 
             {mode === "manual" ? (
-              <form className="create-form" onSubmit={submitManual} noValidate>
+              <form className="create-form" onSubmit={submitManual} noValidate inert={Boolean(manualStatus)}>
                 <div className="field">
                   <label htmlFor="jd">Job description</label>
                   <textarea id="jd" value={fields.jd} onChange={(event) => update("jd", event.target.value)} aria-invalid={Boolean(errors.jd)} aria-describedby={errors.jd ? "jd-error" : "jd-hint"} rows={13} />
@@ -188,10 +212,10 @@ export function CreateKit() {
                   </div>
                 </div>
                 {formError && <p className="form-error" role="alert">{formError}</p>}
-                <div className="form-actions"><button className="primary-button" type="submit" disabled={submitting}>{submitting ? "Queuing…" : "Generate my kit"}</button><span>Generation continues if you leave this page.</span></div>
+                <div className="form-actions"><button className="primary-button button-with-spinner" type="submit" disabled={submitting}>{submitting && <InlineSpinner />}{submitting ? "Starting generation…" : "Generate my kit"}</button><span>Generation continues if you leave this page.</span></div>
               </form>
             ) : (
-              <div className="upload-form">
+              <div className="upload-form" inert={Boolean(manualStatus)}>
                 <div className="upload-drop">
                   <label htmlFor="batch-file">Choose a JSON case file</label>
                   <p>Use the same array format as the evaluation CLI: <code>id</code>, <code>jd</code>, <code>company_url</code>, and <code>days</code>.</p>
@@ -199,7 +223,7 @@ export function CreateKit() {
                   {uploadName && <span>{uploadName}{uploadRows ? ` · ${uploadRows.length} rows` : ""}</span>}
                 </div>
                 {uploadError && <p className="form-error" role="alert">{uploadError}</p>}
-                {uploadRows && <button className="primary-button" type="button" onClick={() => void submitBatch()} disabled={submitting || uploadRows.length === 0}>{submitting ? "Validating rows…" : `Queue ${uploadRows.length} ${uploadRows.length === 1 ? "case" : "cases"}`}</button>}
+                {uploadRows && <button className="primary-button button-with-spinner" type="button" onClick={() => void submitBatch()} disabled={submitting || uploadRows.length === 0}>{submitting && <InlineSpinner />}{submitting ? "Validating rows…" : `Queue ${uploadRows.length} ${uploadRows.length === 1 ? "case" : "cases"}`}</button>}
                 {batchResults && (
                   <div className="batch-results" aria-live="polite">
                     <div className="section-heading"><div><p className="eyebrow">Upload results</p><h3>Each row was checked independently.</h3></div><Link className="text-link" href="/dashboard">View dashboard</Link></div>

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { formatDate, readApiError, stageLabel, type OwnedKit } from "@/lib/api-types";
 import { useSession } from "@/lib/use-session";
 import { WorkspaceHeader } from "./workspace-header";
+import { LoadingState } from "./loading-state";
 
 export function KitWorkspace({ kitId }: { kitId: string }) {
   const { session, error: sessionError, retry: retrySession } = useSession();
@@ -54,7 +55,7 @@ export function KitWorkspace({ kitId }: { kitId: string }) {
       <WorkspaceHeader session={session} backHref="/dashboard" />
       <main className="kit-page">
         {(sessionError || error) && <div className="dashboard-state dashboard-state--error" role="alert"><span>{sessionError ?? error}</span><button className="secondary-button" type="button" onClick={() => sessionError ? retrySession() : void load()}>Retry</button></div>}
-        {!kit && !error && !sessionError && <div className="dashboard-state" aria-live="polite">Opening your preparation kit…</div>}
+        {!kit && !error && !sessionError && <LoadingState label="Opening your preparation kit…" detail="Loading the latest saved revision." />}
 
         {kit && (
           <>

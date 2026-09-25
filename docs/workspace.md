@@ -10,6 +10,14 @@ M3 task 4 connects the authenticated web application to the durable jobs and kit
 4. `/jobs/[jobId]` reloads durable named stages, retry timing, warnings, and actionable failures. Failed jobs can be explicitly retried with the session CSRF token. Completed jobs link to their stable kit ID.
 5. `/kits/[kitId]` presents the company brief, role responsibilities and requirements, grouped questions, flashcards, daily schedule, coverage, warnings, and public sources. It renders text only; retrieved HTML is never inserted.
 
+## Interaction feedback
+
+- Authentication keeps a visible spinner for the entire request, then shows a brief confirmed “Signed in” or “Account created” state before redirecting. The confirmation replaces the form in both the visual and accessibility trees, so the outcome is unambiguous without leaving hidden controls focusable.
+- Kit submission follows the same request → confirmed → redirect sequence. Buttons retain progress feedback for slower requests, and server/client field errors move focus to the first field that needs attention.
+- Active generation uses motion only on live state: an activity spinner, segmented stage meter, flowing current-stage connector, and pulsing current marker. Completed stages are stable checkmarks. Visible copy explains two-second durable polling and that the user may safely leave and return.
+- Route and data waits use labeled progress panels and reserved-space skeletons instead of plain text, reducing perceived stalls and layout shift. Sign-out, batch validation, retry, and password visibility also expose immediate feedback.
+- Every animation uses transform/opacity and is disabled by `prefers-reduced-motion`; status meaning is also expressed in text rather than color or motion alone.
+
 ## API reads and batch enqueue
 
 | Method/path | Response |

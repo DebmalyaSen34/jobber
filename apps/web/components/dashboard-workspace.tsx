@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { formatDate, isActiveJob, stageLabel, type KitSummary, type PublicJob } from "@/lib/api-types";
 import { useSession } from "@/lib/use-session";
 import { WorkspaceHeader } from "./workspace-header";
+import { LoadingState } from "./loading-state";
 
 export function DashboardWorkspace() {
   const { session, error: sessionError, retry: retrySession } = useSession();
@@ -76,8 +77,8 @@ export function DashboardWorkspace() {
             <button className="secondary-button" type="button" onClick={() => sessionError ? retrySession() : setAttempt((value) => value + 1)}>Retry</button>
           </div>
         )}
-        {!session && !sessionError && <div className="dashboard-state" aria-live="polite">Opening your workspace…</div>}
-        {session && loading && <div className="dashboard-state" aria-live="polite">Loading your preparation kits…</div>}
+        {!session && !sessionError && <LoadingState label="Opening your workspace…" detail="Confirming your private session." />}
+        {session && loading && <LoadingState label="Loading your preparation kits…" detail="Checking saved kits and generation activity." />}
 
         {session && !loading && !loadError && (
           <>
@@ -96,6 +97,7 @@ export function DashboardWorkspace() {
                       </div>
                       <h3>{stageLabel(job.stage)}</h3>
                       <p>{new URL(job.source.companyUrl).hostname}</p>
+                      {isActiveJob(job) && <div className="activity-strip" aria-hidden="true"><span /><span /><span /></div>}
                       <div className="card-meta"><span>{job.progress.length} stages recorded</span><span>{formatDate(job.updatedAt)}</span></div>
                     </Link>
                   ))}

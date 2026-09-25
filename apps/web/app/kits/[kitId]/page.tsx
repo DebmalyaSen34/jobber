@@ -1,9 +1,10 @@
 import { Suspense } from "react";
 import { KitWorkspace } from "@/components/kit-workspace";
+import { RouteLoading } from "@/components/loading-state";
 
 export default function KitPage({ params }: PageProps<"/kits/[kitId]">) {
   return (
-    <Suspense fallback={<div className="dashboard-state">Loading kit…</div>}>
+    <Suspense fallback={<RouteLoading label="Loading kit…" />}>
       {params.then(({ kitId }) => <KitWorkspace kitId={kitId} />)}
     </Suspense>
   );

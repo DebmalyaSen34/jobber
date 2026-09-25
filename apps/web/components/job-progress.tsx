@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { formatDate, isActiveJob, readApiError, stageLabel, type PublicJob } from "@/lib/api-types";
 import { useSession } from "@/lib/use-session";
+import { InlineSpinner, LoadingState } from "./loading-state";
 import { WorkspaceHeader } from "./workspace-header";
 
 const stages = [
@@ -98,18 +99,34 @@ export function JobProgress({ jobId }: { jobId: string }) {
         </section>
 
         {(sessionError || error) && <div className="dashboard-state dashboard-state--error" role="alert"><span>{sessionError ?? error}</span><button className="secondary-button" type="button" onClick={() => sessionError ? retrySession() : void load()}>Retry</button></div>}
-        {!job && !error && !sessionError && <div className="dashboard-state" aria-live="polite">Loading generation progress…</div>}
+        {!job && !error && !sessionError && <LoadingState label="Loading generation progress…" detail="Reconnecting to the durable job." />}
 
         {job && (
           <div className="progress-layout">
             <section className="timeline-card" aria-labelledby="timeline-heading">
               <div className="section-heading"><div><p className="eyebrow">Pipeline</p><h2 id="timeline-heading">{stageLabel(job.stage)}</h2></div><span className={`status-chip status-chip--${job.status}`}>{job.status.replaceAll("_", " ")}</span></div>
+              {isActiveJob(job) && (
+                <div className="generation-live" role="status" aria-live="polite">
+                  <InlineSpinner />
+                  <div>
+                    <strong>{job.status === "retry_wait" ? "Waiting for the next safe retry." : job.status === "queued" ? "Your job is securely queued." : `${stageLabel(job.stage)} is in progress.`}</strong>
+                    <span>This page checks the saved job every two seconds. You can leave and return safely.</span>
+                  </div>
+                </div>
+              )}
+              <div className="stage-progress" aria-hidden="true">
+                {stages.map(([id], index) => {
+                  const done = reached.has(id) || complete || (currentIndex > index && currentIndex !== -1);
+                  const current = job.stage === id && isActiveJob(job);
+                  return <span className={current ? "stage-progress__step stage-progress__step--current" : done ? "stage-progress__step stage-progress__step--done" : "stage-progress__step"} key={id} />;
+                })}
+              </div>
               <ol className="stage-list">
                 {stages.map(([id, label], index) => {
                   const done = reached.has(id) || complete || (currentIndex > index && currentIndex !== -1);
                   const current = job.stage === id && isActiveJob(job);
                   const detail = [...job.progress].reverse().find((entry) => entry.stage === id)?.detail;
-                  return <li className={current ? "stage stage--current" : done ? "stage stage--done" : "stage"} key={id}><span className="stage__marker">{done && !current ? "✓" : index + 1}</span><div><strong>{label}</strong>{detail && <p>{detail}</p>}</div></li>;
+                  return <li className={current ? "stage stage--current" : done ? "stage stage--done" : "stage"} key={id}><span className="stage__marker">{done && !current ? "✓" : index + 1}</span><div><strong>{label}{current && <span className="sr-only"> — in progress</span>}</strong>{detail && <p>{detail}</p>}</div></li>;
                 })}
               </ol>
             </section>
@@ -118,7 +135,7 @@ export function JobProgress({ jobId }: { jobId: string }) {
               <div className="fact-card"><span>Attempt</span><strong>{job.retry.attempt} / {job.retry.maxAttempts}</strong></div>
               <div className="fact-card"><span>Last update</span><strong>{formatDate(job.updatedAt)}</strong></div>
               {job.status === "retry_wait" && <div className="notice"><strong>Automatic retry scheduled.</strong><br />{job.retry.nextAttemptAt ? `Next attempt ${formatDate(job.retry.nextAttemptAt)}.` : "The worker will try again shortly."}</div>}
-              {job.error && <div className="failure-panel" role="alert"><p className="eyebrow">{job.error.code}</p><h2>Generation stopped</h2><p>{job.error.message}</p><button className="primary-button" type="button" onClick={() => void retryJob()} disabled={retrying}>{retrying ? "Retrying…" : "Retry generation"}</button></div>}
+              {job.error && <div className="failure-panel" role="alert"><p className="eyebrow">{job.error.code}</p><h2>Generation stopped</h2><p>{job.error.message}</p><button className="primary-button button-with-spinner" type="button" onClick={() => void retryJob()} disabled={retrying}>{retrying && <InlineSpinner />}{retrying ? "Restarting…" : "Retry generation"}</button></div>}
               {complete && <div className="completion-panel"><p className="eyebrow">Complete</p><h2>Ready to study</h2><p>Your questions, flashcards, evidence, and daily plan are saved.</p><Link className="primary-link" href={`/kits/${job.kitId}`}>Open preparation kit</Link></div>}
             </aside>
           </div>
