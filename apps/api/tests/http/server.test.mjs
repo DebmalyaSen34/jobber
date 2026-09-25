@@ -8,6 +8,7 @@ class MemoryPersistence {
   users = new Map();
   sessions = new Map();
   jobs = new Map();
+  kits = new Map();
   nextUserId = 1;
   nextJobId = 1;
 
@@ -76,6 +77,19 @@ class MemoryPersistence {
   async findOwnedJob(ownerId, jobId) {
     const job = this.jobs.get(jobId);
     return job?.ownerId === ownerId ? job : null;
+  }
+
+  async listOwnedJobs(ownerId, limit) {
+    return [...this.jobs.values()].filter((job) => job.ownerId === ownerId).slice(0, limit);
+  }
+
+  async listOwnedKits(ownerId) {
+    return [...this.kits.values()].filter((kit) => kit.ownerId === ownerId);
+  }
+
+  async findOwnedKit(ownerId, kitId) {
+    const kit = this.kits.get(kitId);
+    return kit?.ownerId === ownerId ? kit : null;
   }
 
   async retryOwnedJob(ownerId, jobId, now) {
@@ -287,6 +301,11 @@ test("HTTP job flow enforces CSRF, active deduplication, validation, and ownersh
     assert.equal(queuedBody.deduplicated, false);
     assert.equal(queuedBody.job.status, "queued");
     assert.equal("input" in queuedBody.job, false);
+    assert.deepEqual(queuedBody.job.source, {
+      companyUrl: "https://example.com/careers",
+      days: 5,
+      jdChars: 31,
+    });
 
     const duplicate = await fetch(`${origin}/api/v1/kits`, {
       method: "POST",
@@ -304,6 +323,34 @@ test("HTTP job flow enforces CSRF, active deduplication, validation, and ownersh
     assert.equal(duplicateBody.job.id, queuedBody.job.id);
     assert.equal(wakeCount, 2);
 
+    const listed = await fetch(`${origin}/api/v1/jobs`, { headers: { Cookie: ownerA.cookie } });
+    assert.equal(listed.status, 200);
+    assert.deepEqual((await listed.json()).jobs.map((job) => job.id), [queuedBody.job.id]);
+
+    const batch = await fetch(`${origin}/api/v1/kits/batch`, {
+      method: "POST",
+      headers: {
+        Cookie: ownerA.cookie,
+        Origin: browserOrigin,
+        "Content-Type": "application/json",
+        "X-CSRF-Token": ownerA.body.csrfToken,
+      },
+      body: JSON.stringify([
+        { id: "valid", ...body },
+        { id: "bad-days", ...body, days: 0 },
+        { id: "valid", ...body },
+      ]),
+    });
+    assert.equal(batch.status, 202);
+    const batchBody = await batch.json();
+    assert.equal(batchBody.queuedCount, 1);
+    assert.equal(batchBody.results[0].status, "queued");
+    assert.equal(batchBody.results[0].deduplicated, true);
+    assert.equal(batchBody.results[1].status, "invalid");
+    assert.equal(batchBody.results[1].error.fields.days, "Days must be at least 1.");
+    assert.equal(batchBody.results[2].error.code, "DUPLICATE_ID");
+    assert.equal(wakeCount, 3);
+
     const owned = await fetch(`${origin}/api/v1/jobs/${queuedBody.job.id}`, { headers: { Cookie: ownerA.cookie } });
     assert.equal(owned.status, 200);
     assert.equal((await owned.json()).job.id, queuedBody.job.id);
@@ -311,6 +358,31 @@ test("HTTP job flow enforces CSRF, active deduplication, validation, and ownersh
     const hidden = await fetch(`${origin}/api/v1/jobs/${queuedBody.job.id}`, { headers: { Cookie: ownerB.cookie } });
     assert.equal(hidden.status, 404);
     assert.equal((await hidden.json()).error.code, "NOT_FOUND");
+
+    persistence.kits.set(queuedBody.job.kitId, {
+      id: queuedBody.job.kitId,
+      ownerId: "1",
+      sourceJobId: queuedBody.job.id,
+      originalInput: { jd: body.jd, companyUrl: body.company_url, days: body.days },
+      content: {
+        source: { company: "Example", company_url: body.company_url, role: "Engineer", location: "", jd_chars: body.jd.length, researched_at: new Date().toISOString(), pages_used: [] },
+        company_brief: { summary: "Example summary", what_they_do: "Builds examples.", sources: [] },
+        role: { title: "Engineer", seniority: "", responsibilities: [], requirements: [] },
+        questions: [], flashcards: [], schedule: { days_available: 5, days: [] },
+        coverage: { uncovered_requirement_ids: [], passes: 0 },
+      },
+      revision: 1,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    const kitList = await fetch(`${origin}/api/v1/kits`, { headers: { Cookie: ownerA.cookie } });
+    assert.equal(kitList.status, 200);
+    assert.equal((await kitList.json()).kits[0].role, "Engineer");
+    const ownedKit = await fetch(`${origin}/api/v1/kits/${queuedBody.job.kitId}`, { headers: { Cookie: ownerA.cookie } });
+    assert.equal(ownedKit.status, 200);
+    assert.equal((await ownedKit.json()).kit.originalInput.jd, body.jd);
+    const hiddenKit = await fetch(`${origin}/api/v1/kits/${queuedBody.job.kitId}`, { headers: { Cookie: ownerB.cookie } });
+    assert.equal(hiddenKit.status, 404);
 
     const activeRetry = await fetch(`${origin}/api/v1/jobs/${queuedBody.job.id}/retry`, {
       method: "POST",

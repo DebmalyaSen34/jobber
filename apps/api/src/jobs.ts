@@ -69,6 +69,7 @@ export interface JobStore {
     now: Date;
   }): Promise<{ job: GenerationJob; deduplicated: boolean }>;
   findOwnedJob(ownerId: string, jobId: string): Promise<GenerationJob | null>;
+  listOwnedJobs(ownerId: string, limit: number): Promise<GenerationJob[]>;
   claimNextJob(workerId: string, now: Date, leaseMs: number): Promise<ClaimedJob | null>;
   renewJobLease(jobId: string, leaseToken: string, now: Date, leaseMs: number): Promise<boolean>;
   checkpointJob(jobId: string, leaseToken: string, progress: JobProgress, now: Date, leaseMs: number): Promise<boolean>;
@@ -168,6 +169,71 @@ export class JobService {
     return job;
   }
 
+  async listOwned(ownerId: string): Promise<GenerationJob[]> {
+    return this.store.listOwnedJobs(ownerId, 100);
+  }
+
+  async enqueueBatch(ownerId: string, body: unknown, now = new Date()) {
+    if (!Array.isArray(body)) {
+      throw new JobError("INVALID_BATCH", 400, "Upload a JSON array of preparation cases.");
+    }
+    if (body.length > 50) {
+      throw new JobError("BATCH_TOO_LARGE", 400, "A batch can contain at most 50 cases.");
+    }
+
+    const seenIds = new Set<string>();
+    const results = [];
+    let queuedCount = 0;
+    for (const [index, value] of body.entries()) {
+      const record = value && typeof value === "object" && !Array.isArray(value)
+        ? value as Record<string, unknown>
+        : {};
+      const id = typeof record.id === "string" ? record.id.trim() : "";
+      if (!id || seenIds.has(id)) {
+        results.push({
+          row: index + 1,
+          ...(id ? { id } : {}),
+          status: "invalid" as const,
+          error: {
+            code: !id ? "MISSING_ID" : "DUPLICATE_ID",
+            message: !id ? "Each case needs a non-empty id." : `Case id ${id} is duplicated.`,
+            fields: { id: !id ? "Case ID is required." : "Case ID must be unique in this upload." },
+          },
+        });
+        continue;
+      }
+      seenIds.add(id);
+      try {
+        const queued = await this.enqueue(ownerId, {
+          jd: record.jd,
+          company_url: record.company_url,
+          days: record.days,
+        }, now);
+        queuedCount += 1;
+        results.push({
+          row: index + 1,
+          id,
+          status: "queued" as const,
+          deduplicated: queued.deduplicated,
+          job: publicJob(queued.job),
+        });
+      } catch (error) {
+        if (!(error instanceof JobError)) throw error;
+        results.push({
+          row: index + 1,
+          id,
+          status: "invalid" as const,
+          error: {
+            code: error.code,
+            message: error.message,
+            ...(error.options.fields ? { fields: error.options.fields } : {}),
+          },
+        });
+      }
+    }
+    return { results, queuedCount };
+  }
+
   async retry(ownerId: string, jobId: string, now = new Date()): Promise<GenerationJob> {
     const existing = await this.getOwned(ownerId, jobId);
     if (existing.status !== "failed") {
@@ -192,6 +258,11 @@ export function publicJob(job: GenerationJob) {
     stage: job.stage,
     progress: job.progress.map((progress) => ({ ...progress })),
     warnings: job.warnings.map((warning) => ({ ...warning })),
+    source: {
+      companyUrl: job.input.companyUrl,
+      days: job.input.days,
+      jdChars: job.input.jd.length,
+    },
     retry: {
       attempt: job.attempt,
       maxAttempts: job.maxAttempts,

@@ -4,6 +4,7 @@ import { AuthError, AuthService, assertOwner, publicUser, type SessionWithUser }
 import type { AppConfig } from "./config.js";
 import type { Persistence } from "./database.js";
 import { JobError, JobService, publicJob } from "./jobs.js";
+import { publicKit, publicKitSummary } from "./kits.js";
 
 const DEVELOPMENT_SESSION_COOKIE = "jobber_session";
 const PRODUCTION_SESSION_COOKIE = "__Host-jobber_session";
@@ -216,6 +217,34 @@ export function createApp(
     dependencies.notifyJobAvailable?.();
     response.setHeader("Location", `/api/v1/jobs/${queued.job.id}`);
     response.status(202).json({ job: publicJob(queued.job), deduplicated: queued.deduplicated });
+  });
+
+  app.post("/api/v1/kits/batch", async (request, response) => {
+    requireMutationOrigin(request);
+    const session = await resolveAuthenticatedSession(request, response);
+    auth.verifyCsrf(session, request.header("x-csrf-token"));
+    const batch = await jobs.enqueueBatch(session.user.id, request.body);
+    if (batch.queuedCount > 0) dependencies.notifyJobAvailable?.();
+    response.status(202).json(batch);
+  });
+
+  app.get("/api/v1/kits", async (request, response) => {
+    const session = await resolveAuthenticatedSession(request, response);
+    const kits = await persistence.listOwnedKits(session.user.id);
+    response.json({ kits: kits.map(publicKitSummary) });
+  });
+
+  app.get("/api/v1/kits/:kitId", async (request, response) => {
+    const session = await resolveAuthenticatedSession(request, response);
+    const kit = await persistence.findOwnedKit(session.user.id, request.params.kitId);
+    if (!kit) throw new JobError("NOT_FOUND", 404, "Kit not found.");
+    response.json({ kit: publicKit(kit) });
+  });
+
+  app.get("/api/v1/jobs", async (request, response) => {
+    const session = await resolveAuthenticatedSession(request, response);
+    const ownedJobs = await jobs.listOwned(session.user.id);
+    response.json({ jobs: ownedJobs.map(publicJob) });
   });
 
   app.get("/api/v1/jobs/:jobId", async (request, response) => {

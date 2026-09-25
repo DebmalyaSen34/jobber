@@ -11,8 +11,9 @@ import type {
   JobStatus,
   JobStore,
 } from "./jobs.js";
+import type { KitStore, OwnedKit } from "./kits.js";
 
-export interface Persistence extends AuthStore, JobStore {
+export interface Persistence extends AuthStore, JobStore, KitStore {
   connect(): Promise<void>;
   ping(): Promise<void>;
   close(): Promise<void>;
@@ -120,6 +121,19 @@ function toGenerationJob(record: JobRecord): GenerationJob {
     updatedAt: record.updated_at,
     ...(record.started_at ? { startedAt: record.started_at } : {}),
     ...(record.completed_at ? { completedAt: record.completed_at } : {}),
+  };
+}
+
+function toOwnedKit(record: KitRecord): OwnedKit {
+  return {
+    id: record._id.toHexString(),
+    ownerId: record.owner_id.toHexString(),
+    sourceJobId: record.source_job_id.toHexString(),
+    originalInput: record.original_input,
+    content: record.content,
+    revision: record.revision,
+    createdAt: record.created_at,
+    updatedAt: record.updated_at,
   };
 }
 
@@ -362,6 +376,30 @@ export class MongoPersistence implements Persistence {
     if (!ObjectId.isValid(ownerId) || !ObjectId.isValid(jobId)) return null;
     const record = await this.jobs.findOne({ _id: new ObjectId(jobId), owner_id: new ObjectId(ownerId) });
     return record ? toGenerationJob(record) : null;
+  }
+
+  async listOwnedJobs(ownerId: string, limit: number): Promise<GenerationJob[]> {
+    if (!ObjectId.isValid(ownerId)) return [];
+    const records = await this.jobs.find({ owner_id: new ObjectId(ownerId) })
+      .sort({ updated_at: -1 })
+      .limit(limit)
+      .toArray();
+    return records.map(toGenerationJob);
+  }
+
+  async listOwnedKits(ownerId: string): Promise<OwnedKit[]> {
+    if (!ObjectId.isValid(ownerId)) return [];
+    const records = await this.kits.find({ owner_id: new ObjectId(ownerId) })
+      .sort({ updated_at: -1 })
+      .limit(100)
+      .toArray();
+    return records.map(toOwnedKit);
+  }
+
+  async findOwnedKit(ownerId: string, kitId: string): Promise<OwnedKit | null> {
+    if (!ObjectId.isValid(ownerId) || !ObjectId.isValid(kitId)) return null;
+    const record = await this.kits.findOne({ _id: new ObjectId(kitId), owner_id: new ObjectId(ownerId) });
+    return record ? toOwnedKit(record) : null;
   }
 
   async claimNextJob(workerId: string, now: Date, leaseMs: number): Promise<ClaimedJob | null> {

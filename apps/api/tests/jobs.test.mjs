@@ -45,6 +45,10 @@ class MemoryJobStore {
     return job?.ownerId === ownerId ? job : null;
   }
 
+  async listOwnedJobs(ownerId, limit) {
+    return [...this.jobs.values()].filter((job) => job.ownerId === ownerId).slice(0, limit);
+  }
+
   async claimNextJob(workerId, now, leaseMs) {
     for (const expired of this.jobs.values()) {
       if (expired.status === "running" && expired.leaseExpiresAt <= now && expired.attempt >= expired.maxAttempts) {
