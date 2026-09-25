@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { formatDate, isActiveJob, stageLabel, type KitSummary, type PublicJob } from "@/lib/api-types";
+import { formatDate, isActiveJob, jobStatusLabel, stageLabel, type KitSummary, type PublicJob } from "@/lib/api-types";
 import { useSession } from "@/lib/use-session";
 import { WorkspaceHeader } from "./workspace-header";
 import { LoadingState } from "./loading-state";
@@ -61,7 +61,7 @@ export function DashboardWorkspace() {
   return (
     <div className="workspace-shell">
       <WorkspaceHeader session={session} />
-      <main className="workspace-main">
+      <main id="main" className="workspace-main">
         <section className="workspace-hero" aria-labelledby="dashboard-title">
           <div>
             <p className="eyebrow">Private workspace</p>
@@ -92,13 +92,13 @@ export function DashboardWorkspace() {
                   {visibleJobs.map((job) => (
                     <Link className="kit-card job-card" href={`/jobs/${job.id}`} key={job.id}>
                       <div className="card-topline">
-                        <span className={`status-chip status-chip--${job.status}`}>{job.status.replaceAll("_", " ")}</span>
+                        <span className={`status-chip status-chip--${job.status}`}>{jobStatusLabel(job.status)}</span>
                         <span>{job.source.days} days</span>
                       </div>
                       <h3>{stageLabel(job.stage)}</h3>
                       <p>{new URL(job.source.companyUrl).hostname}</p>
                       {isActiveJob(job) && <div className="activity-strip" aria-hidden="true"><span /><span /><span /></div>}
-                      <div className="card-meta"><span>{job.progress.length} stages recorded</span><span>{formatDate(job.updatedAt)}</span></div>
+                      <div className="card-meta"><span>{job.progress.length} {job.progress.length === 1 ? "step" : "steps"} complete</span><span>{formatDate(job.updatedAt)}</span></div>
                     </Link>
                   ))}
                 </div>
@@ -113,7 +113,7 @@ export function DashboardWorkspace() {
               {kits.length === 0 && visibleJobs.length === 0 ? (
                 <div className="empty-panel">
                   <span className="empty-panel__number">01</span>
-                  <div><h3>Start with the role you want.</h3><p>Paste a job description or upload a JSON batch. A short, non-empty description is enough.</p></div>
+                  <div><h3>Start with the role you want.</h3><p>Paste a job description or upload several roles at once. A short, non-empty description is enough.</p></div>
                   <Link className="primary-link" href="/create">Create your first kit</Link>
                 </div>
               ) : kits.length === 0 ? (
@@ -125,7 +125,7 @@ export function DashboardWorkspace() {
                       <div className="card-topline"><span className="status-chip status-chip--completed">Ready</span><span>{kit.days} days</span></div>
                       <h3>{kit.role || "Untitled role"}</h3>
                       <p>{kit.company || "Company not identified"}</p>
-                      <div className="card-meta"><span>Revision {kit.revision}</span><span>{formatDate(kit.updatedAt)}</span></div>
+                      <div className="card-meta"><span>Last updated</span><span>{formatDate(kit.updatedAt)}</span></div>
                       {kit.warningCount > 0 && <span className="warning-note">{kit.warningCount} research {kit.warningCount === 1 ? "note" : "notes"}</span>}
                     </Link>
                   ))}

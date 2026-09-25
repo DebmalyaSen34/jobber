@@ -102,7 +102,7 @@ function manualId(prefix: string): string {
 }
 
 function confirmDelete(label: string): boolean {
-  return window.confirm(`Delete ${label}? This change will not reach the server until you save.`);
+  return window.confirm(`Delete ${label}? This change will be applied when you save.`);
 }
 
 function ReferenceChecks({
@@ -224,6 +224,9 @@ export function KitWorkspace({ kitId }: { kitId: string }) {
       + kit.reconciliation.removedFlashcardRequirementLinks
       + kit.reconciliation.removedScheduleQuestionLinks
   ) : 0;
+  const researchSourceCount = draft
+    ? new Set([...draft.source.pages_used, ...draft.company_brief.sources]).size
+    : 0;
 
   function startEditing() {
     if (!kit) return;
@@ -268,8 +271,8 @@ export function KitWorkspace({ kitId }: { kitId: string }) {
         + body.kit.reconciliation.removedFlashcardRequirementLinks
         + body.kit.reconciliation.removedScheduleQuestionLinks;
       setSaveMessage(cleaned > 0
-        ? `Saved revision ${body.kit.revision}. Removed ${cleaned} stale ${cleaned === 1 ? "reference" : "references"}.`
-        : `Saved revision ${body.kit.revision}. Coverage and schedule checks are up to date.`);
+        ? `Changes saved. Removed ${cleaned} outdated ${cleaned === 1 ? "link" : "links"} between kit sections.`
+        : "Changes saved. Coverage and schedule checks are up to date.");
     } catch (caught) {
       const message = caught instanceof Error && caught.message ? caught.message : "Your changes could not be saved.";
       setSaveMessage(message);
@@ -283,7 +286,7 @@ export function KitWorkspace({ kitId }: { kitId: string }) {
     const baseDraft = copyContent(draft!);
     const basePins = [...pinnedQuestionIds];
     setRegenerating(key);
-    setRegenerationMessage(`Regenerating ${stageLabel(key)}… You can keep editing; save those edits while this runs so the merge can protect them.`);
+    setRegenerationMessage(`Refreshing ${stageLabel(key)}… You can keep editing; save any changes while this runs so they remain protected.`);
     try {
       const response = await fetch(`/api/v1/kits/${encodeURIComponent(kit.id)}/regenerate`, {
         method: "POST",
@@ -312,12 +315,12 @@ export function KitWorkspace({ kitId }: { kitId: string }) {
         setPinnedQuestionIds(localPinsChanged ? pinsRef.current : remotePins);
         setSaveState("idle");
         setSaveMessage("");
-        setRegenerationMessage(`${stageLabel(key)} merged. Your newer local edits were preserved on top; review and save them.`);
+        setRegenerationMessage(`${stageLabel(key)} updated. Your newer local edits are still here; review and save them.`);
       } else {
         setKit(mergedKit);
         setDraft(copyContent(mergedKit.content));
         setPinnedQuestionIds(remotePins);
-        setRegenerationMessage(`${stageLabel(key)} regenerated and safely merged.`);
+        setRegenerationMessage(`${stageLabel(key)} refreshed successfully.`);
       }
     } catch (caught) {
       setRegenerationMessage(caught instanceof Error && caught.message ? caught.message : "Regeneration failed.");
@@ -364,9 +367,9 @@ export function KitWorkspace({ kitId }: { kitId: string }) {
     return (
       <div className="workspace-shell">
         <WorkspaceHeader session={session} backHref="/dashboard" />
-        <main className="kit-page">
+        <main className="kit-page" id="main">
           {(sessionError || error) && <div className="dashboard-state dashboard-state--error" role="alert"><span>{sessionError ?? error}</span><button className="secondary-button" type="button" onClick={() => sessionError ? retrySession() : void load()}>Retry</button></div>}
-          {!error && !sessionError && <LoadingState label="Opening your preparation kit…" detail="Loading the latest saved revision." />}
+          {!error && !sessionError && <LoadingState label="Opening your preparation kit…" detail="Loading the latest saved version." />}
         </main>
       </div>
     );
@@ -375,7 +378,7 @@ export function KitWorkspace({ kitId }: { kitId: string }) {
   return (
     <div className="workspace-shell">
       <WorkspaceHeader session={session} backHref="/dashboard" />
-      <main className="kit-page">
+      <main className="kit-page" id="main">
         {(sessionError || error) && <div className="dashboard-state dashboard-state--error" role="alert"><span>{sessionError ?? error}</span><button className="secondary-button" type="button" onClick={() => sessionError ? retrySession() : void load()}>Retry</button></div>}
 
         <header className="kit-hero">
@@ -387,13 +390,13 @@ export function KitWorkspace({ kitId }: { kitId: string }) {
           <dl className="kit-stats"><div><dt>Questions</dt><dd>{draft.questions.length}</dd></div><div><dt>Flashcards</dt><dd>{draft.flashcards.length}</dd></div><div><dt>Days</dt><dd>{draft.schedule.days_available}</dd></div></dl>
         </header>
 
-        {draft.warnings && draft.warnings.length > 0 && <details className="warning-panel kit-warning"><summary>{draft.warnings.length} research {draft.warnings.length === 1 ? "note" : "notes"}</summary><ul>{draft.warnings.map((warning, index) => <li key={`${warning.code}-${index}`}><strong>{warning.code.replaceAll("_", " ")}</strong><span>{warning.message}</span></li>)}</ul></details>}
+        {draft.warnings && draft.warnings.length > 0 && <details className="warning-panel kit-warning"><summary>{draft.warnings.length} research {draft.warnings.length === 1 ? "note" : "notes"}</summary><ul>{draft.warnings.map((warning, index) => <li key={`${warning.code}-${index}`}><span>{warning.message}</span></li>)}</ul></details>}
         <nav className="kit-nav" aria-label="Kit sections"><a href="#company">Company</a><a href="#role">Role</a><a href="#questions">Questions</a><a href="#flashcards">Flashcards</a><a href="#practice">Practice</a><a href="#schedule">Schedule</a><a href="#evidence">Evidence</a></nav>
 
         <div className="editor-toolbar" aria-label="Kit editing controls">
-          <div aria-live="polite"><strong>{editing ? (dirty ? "Unsaved changes" : "Editing revision is up to date") : `Revision ${kit?.revision ?? 1}`}</strong><span className={`save-message save-message--${saveState}`}>{saveMessage || (editing ? "Changes stay local until you save." : "Open edit mode to customize this kit.")}</span></div>
+          <div aria-live="polite"><strong>{editing ? (dirty ? "Unsaved changes" : "All changes saved") : "Saved kit"}</strong><span className={`save-message save-message--${saveState}`}>{saveMessage || (editing ? "Changes stay on this page until you save." : "Open edit mode to customize this kit.")}</span></div>
           <div className="editor-toolbar__actions">{editing ? <><button className="secondary-button" type="button" onClick={discardEdits} disabled={saveState === "saving"}>Done</button><button className="primary-button button-with-spinner" type="button" onClick={() => void save()} disabled={!dirty || saveState === "saving"}>{saveState === "saving" && <InlineSpinner />}{saveState === "saving" ? "Saving…" : "Save changes"}</button></> : <button className="primary-button" type="button" onClick={startEditing}>Edit kit</button>}</div>
-          {saveState === "conflict" && <button className="text-link editor-reload" type="button" onClick={() => void load()}>Discard local edits and load latest revision</button>}
+          {saveState === "conflict" && <button className="text-link editor-reload" type="button" onClick={() => void load()}>Discard local edits and load latest saved version</button>}
           {regenerationMessage && <p className="editor-note" aria-live="polite">{regenerating && <InlineSpinner />} {regenerationMessage}</p>}
         </div>
 
@@ -409,7 +412,7 @@ export function KitWorkspace({ kitId }: { kitId: string }) {
           </div>
           {derivedState.uncovered_requirement_ids.length > 0 && <div className="health-detail"><strong>Question coverage gaps</strong><p>These requirements currently have no linked interview question:</p><ul>{derivedState.uncovered_requirement_ids.map((id) => <li key={id}>{requirementById.get(id)?.text ?? id}{derivedState.uncovered_must_requirement_ids.includes(id) ? <span>Must-have</span> : null}</li>)}</ul></div>}
           {derivedState.schedule_needs_regeneration && <div className="health-detail"><strong>Schedule repair recommended</strong><p>{derivedState.unscheduled_question_ids.length > 0 ? `${derivedState.unscheduled_question_ids.length} ${derivedState.unscheduled_question_ids.length === 1 ? "question is" : "questions are"} missing from the plan. ` : ""}{derivedState.covered_but_unscheduled_must_requirement_ids.length > 0 ? `${derivedState.covered_but_unscheduled_must_requirement_ids.length} covered must-have ${derivedState.covered_but_unscheduled_must_requirement_ids.length === 1 ? "requirement is" : "requirements are"} absent from scheduled practice.` : ""}</p></div>}
-          {reconciliationTotal > 0 && kit && kit.reconciliation.revision === kit.revision && <p className="health-reconciliation" role="status">The last save safely removed {reconciliationTotal} stale {reconciliationTotal === 1 ? "reference" : "references"} after content was deleted.</p>}
+          {reconciliationTotal > 0 && kit && kit.reconciliation.revision === kit.revision && <p className="health-reconciliation" role="status">The last save removed {reconciliationTotal} outdated {reconciliationTotal === 1 ? "link" : "links"} between kit sections after content was deleted.</p>}
           {(derivedState.uncovered_requirement_ids.length > 0 || derivedState.schedule_needs_regeneration) && <div className="health-actions">
             {derivedState.uncovered_requirement_ids.length > 0 && <a className="small-button" href="#questions">Review question coverage</a>}
             {derivedState.schedule_needs_regeneration && <button className="small-button button-with-spinner" type="button" disabled={dirty || Boolean(regenerating) || derivedState.uncovered_must_requirement_ids.length > 0} aria-describedby={dirty || derivedState.uncovered_must_requirement_ids.length > 0 ? "schedule-repair-help" : undefined} onClick={() => void regenerate({ type: "schedule" })}>{regenerating === "schedule" && <InlineSpinner />}{regenerating === "schedule" ? "Repairing…" : "Repair schedule"}</button>}
@@ -458,8 +461,8 @@ export function KitWorkspace({ kitId }: { kitId: string }) {
         </section>
 
         <section className="kit-section" id="evidence" aria-labelledby="evidence-heading">
-          <div className="section-number">07</div><div><p className="eyebrow">Sources & coverage</p><h2 id="evidence-heading">What supports this kit.</h2><div className="evidence-grid"><div><span>Coverage passes</span><strong>{draft.coverage.passes}</strong></div><div><span>{dirty ? "Preview gaps" : "Saved gaps"}</span><strong>{derivedState?.uncovered_requirement_ids.length ?? 0}</strong></div><div><span>Last updated</span><strong>{kit ? formatDate(kit.updatedAt) : "—"}</strong></div></div>
-            {editing && <p className="editor-note">Coverage and schedule health update locally as you edit, then the server verifies them when you save. Source URLs and generation evidence remain read-only.</p>}
+          <div className="section-number">07</div><div><p className="eyebrow">Sources & coverage</p><h2 id="evidence-heading">What supports this kit.</h2><div className="evidence-grid"><div><span>Research sources</span><strong>{researchSourceCount}</strong></div><div><span>{dirty ? "Preview gaps" : "Saved gaps"}</span><strong>{derivedState?.uncovered_requirement_ids.length ?? 0}</strong></div><div><span>Last updated</span><strong>{kit ? formatDate(kit.updatedAt) : "—"}</strong></div></div>
+            {editing && <p className="editor-note">Coverage and schedule health update as you edit, then Jobber checks them when you save. Research sources remain read-only.</p>}
             <ul className="source-list"><li><a href={draft.source.company_url} target="_blank" rel="noreferrer">Original company URL</a></li>{[...new Set([...draft.source.pages_used, ...draft.company_brief.sources])].map((source) => <li key={source}><a href={source} target="_blank" rel="noreferrer">{source}</a></li>)}</ul>
             {draft.source.pages_used.length === 0 && draft.company_brief.sources.length === 0 && <p className="section-empty">No public pages were used. This kit is based on the supplied job description.</p>}
           </div>

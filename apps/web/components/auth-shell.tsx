@@ -14,7 +14,7 @@ export function AuthShell({ eyebrow, title, description, children }: {
         <Brand />
         <BackLink href="/" destination="home" />
       </header>
-      <main className="auth-main">
+      <main id="main" className="auth-main">
         <section className="auth-intro">
           <p className="eyebrow">{eyebrow}</p>
           <h1>{title}</h1>

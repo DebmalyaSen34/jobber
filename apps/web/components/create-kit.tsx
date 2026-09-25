@@ -167,7 +167,7 @@ export function CreateKit() {
   return (
     <div className="workspace-shell">
       <WorkspaceHeader session={session} backHref="/dashboard" />
-      <main className="form-page">
+      <main id="main" className="form-page">
         <header className="form-intro">
           <p className="eyebrow">New preparation kit</p>
           <h1>Bring the role.<br />We’ll build the plan.</h1>
@@ -183,7 +183,7 @@ export function CreateKit() {
               <TransitionOverlay
                 confirmed={manualStatus === "redirecting"}
                 title={manualStatus === "redirecting" ? "Kit queued." : "Starting your kit…"}
-                detail={manualStatus === "redirecting" ? "Opening live generation progress now…" : "Validating the role and creating a durable generation job."}
+                detail={manualStatus === "redirecting" ? "Opening live generation progress now…" : "Checking the role and saving your preparation request."}
               />
             )}
             <h2 className="sr-only" id="create-mode-heading">Choose how to create kits</h2>
@@ -218,7 +218,7 @@ export function CreateKit() {
               <div className="upload-form" inert={Boolean(manualStatus)}>
                 <div className="upload-drop">
                   <label htmlFor="batch-file">Choose a JSON case file</label>
-                  <p>Use the same array format as the evaluation CLI: <code>id</code>, <code>jd</code>, <code>company_url</code>, and <code>days</code>.</p>
+                  <p>Upload a JSON array. Each item needs <code>id</code>, <code>jd</code>, <code>company_url</code>, and <code>days</code>.</p>
                   <input id="batch-file" type="file" accept="application/json,.json" onChange={(event) => void readUpload(event)} />
                   {uploadName && <span>{uploadName}{uploadRows ? ` · ${uploadRows.length} rows` : ""}</span>}
                 </div>

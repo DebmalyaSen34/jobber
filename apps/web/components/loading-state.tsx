@@ -17,7 +17,7 @@ export function LoadingState({ label, detail }: { label: string; detail?: string
 
 export function RouteLoading({ label }: { label: string }) {
   return (
-    <main className="route-loading" aria-label={label} aria-busy="true">
+    <main id="main" className="route-loading" aria-label={label} aria-busy="true">
       <LoadingState label={label} detail="Your saved work is safe while this page opens." />
       <div className="skeleton-grid" aria-hidden="true">
         <div className="skeleton-card skeleton-card--wide" />

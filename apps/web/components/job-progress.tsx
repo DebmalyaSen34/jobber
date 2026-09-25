@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-import { formatDate, isActiveJob, readApiError, stageLabel, type PublicJob } from "@/lib/api-types";
+import { formatDate, isActiveJob, jobStatusLabel, readApiError, stageLabel, type PublicJob } from "@/lib/api-types";
 import { useSession } from "@/lib/use-session";
 import { InlineSpinner, LoadingState } from "./loading-state";
 import { WorkspaceHeader } from "./workspace-header";
@@ -90,27 +90,27 @@ export function JobProgress({ jobId }: { jobId: string }) {
   return (
     <div className="workspace-shell">
       <WorkspaceHeader session={session} backHref="/dashboard" />
-      <main className="progress-page">
+      <main id="main" className="progress-page">
         <section className="progress-intro">
-          <p className="eyebrow">Generation job</p>
+          <p className="eyebrow">Preparation progress</p>
           <h1>{complete ? "Your kit is ready." : job?.status === "failed" ? "Generation needs attention." : "Building your preparation kit."}</h1>
-          <p>{job ? `${new URL(job.source.companyUrl).hostname} · ${job.source.days} day plan` : "Loading the persisted job…"}</p>
-          {searchParams.get("duplicate") === "1" && <div className="notice">An identical kit is already being generated, so we reopened its existing job.</div>}
+          <p>{job ? `${new URL(job.source.companyUrl).hostname} · ${job.source.days} day plan` : "Loading your saved progress…"}</p>
+          {searchParams.get("duplicate") === "1" && <div className="notice">This role is already being prepared, so we reopened its existing progress.</div>}
         </section>
 
         {(sessionError || error) && <div className="dashboard-state dashboard-state--error" role="alert"><span>{sessionError ?? error}</span><button className="secondary-button" type="button" onClick={() => sessionError ? retrySession() : void load()}>Retry</button></div>}
-        {!job && !error && !sessionError && <LoadingState label="Loading generation progress…" detail="Reconnecting to the durable job." />}
+        {!job && !error && !sessionError && <LoadingState label="Loading generation progress…" detail="Reconnecting to your saved progress." />}
 
         {job && (
           <div className="progress-layout">
             <section className="timeline-card" aria-labelledby="timeline-heading">
-              <div className="section-heading"><div><p className="eyebrow">Pipeline</p><h2 id="timeline-heading">{stageLabel(job.stage)}</h2></div><span className={`status-chip status-chip--${job.status}`}>{job.status.replaceAll("_", " ")}</span></div>
+              <div className="section-heading"><div><p className="eyebrow">Progress</p><h2 id="timeline-heading">{stageLabel(job.stage)}</h2></div><span className={`status-chip status-chip--${job.status}`}>{jobStatusLabel(job.status)}</span></div>
               {isActiveJob(job) && (
                 <div className="generation-live" role="status" aria-live="polite">
                   <InlineSpinner />
                   <div>
                     <strong>{job.status === "retry_wait" ? "Waiting for the next safe retry." : job.status === "queued" ? "Your job is securely queued." : `${stageLabel(job.stage)} is in progress.`}</strong>
-                    <span>This page checks the saved job every two seconds. You can leave and return safely.</span>
+                    <span>This page refreshes automatically. You can leave and return safely.</span>
                   </div>
                 </div>
               )}
@@ -134,14 +134,14 @@ export function JobProgress({ jobId }: { jobId: string }) {
             <aside className="progress-aside">
               <div className="fact-card"><span>Attempt</span><strong>{job.retry.attempt} / {job.retry.maxAttempts}</strong></div>
               <div className="fact-card"><span>Last update</span><strong>{formatDate(job.updatedAt)}</strong></div>
-              {job.status === "retry_wait" && <div className="notice"><strong>Automatic retry scheduled.</strong><br />{job.retry.nextAttemptAt ? `Next attempt ${formatDate(job.retry.nextAttemptAt)}.` : "The worker will try again shortly."}</div>}
-              {job.error && <div className="failure-panel" role="alert"><p className="eyebrow">{job.error.code}</p><h2>Generation stopped</h2><p>{job.error.message}</p><button className="primary-button button-with-spinner" type="button" onClick={() => void retryJob()} disabled={retrying}>{retrying && <InlineSpinner />}{retrying ? "Restarting…" : "Retry generation"}</button></div>}
+              {job.status === "retry_wait" && <div className="notice"><strong>Automatic retry scheduled.</strong><br />{job.retry.nextAttemptAt ? `Next attempt ${formatDate(job.retry.nextAttemptAt)}.` : "Jobber will try again shortly."}</div>}
+              {job.error && <div className="failure-panel" role="alert"><p className="eyebrow">Needs attention</p><h2>Generation stopped</h2><p>{job.error.message}</p><button className="primary-button button-with-spinner" type="button" onClick={() => void retryJob()} disabled={retrying}>{retrying && <InlineSpinner />}{retrying ? "Restarting…" : "Retry generation"}</button></div>}
               {complete && <div className="completion-panel"><p className="eyebrow">Complete</p><h2>Ready to study</h2><p>Your questions, flashcards, evidence, and daily plan are saved.</p><Link className="primary-link" href={`/kits/${job.kitId}`}>Open preparation kit</Link></div>}
             </aside>
           </div>
         )}
 
-        {job && job.warnings.length > 0 && <section className="warning-panel" aria-labelledby="warning-heading"><p className="eyebrow">Research notes</p><h2 id="warning-heading">Usable kit, with honest limits</h2><ul>{job.warnings.map((warning, index) => <li key={`${warning.code}-${index}`}><strong>{warning.code.replaceAll("_", " ")}</strong><span>{warning.message}</span></li>)}</ul></section>}
+        {job && job.warnings.length > 0 && <section className="warning-panel" aria-labelledby="warning-heading"><p className="eyebrow">Research notes</p><h2 id="warning-heading">Usable kit, with honest limits</h2><ul>{job.warnings.map((warning, index) => <li key={`${warning.code}-${index}`}><span>{warning.message}</span></li>)}</ul></section>}
       </main>
     </div>
   );

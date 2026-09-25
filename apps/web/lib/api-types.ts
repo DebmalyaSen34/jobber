@@ -163,3 +163,14 @@ export function formatDate(value: string): string {
 export function stageLabel(stage: string): string {
   return stage.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
+
+export function jobStatusLabel(status: PublicJob["status"]): string {
+  switch (status) {
+    case "queued": return "Queued";
+    case "running": return "In progress";
+    case "retry_wait": return "Retry scheduled";
+    case "completed": return "Complete";
+    case "completed_with_warnings": return "Complete with notes";
+    case "failed": return "Needs attention";
+  }
+}
