@@ -22,8 +22,10 @@ import {
   type OwnedKit,
 } from "./kits.js";
 import type { ClaimedRegeneration, RegenerationJob, RegenerationStore } from "./regenerations.js";
+import type { PracticeConfidence } from "@jobber/core";
+import type { PracticeRecord, PracticeReview, PracticeStore } from "./practice.js";
 
-export interface Persistence extends AuthStore, JobStore, KitStore, RegenerationStore {
+export interface Persistence extends AuthStore, JobStore, KitStore, RegenerationStore, PracticeStore {
   connect(): Promise<void>;
   ping(): Promise<void>;
   close(): Promise<void>;
@@ -117,6 +119,41 @@ type RegenerationRecord = {
   completed_at?: Date;
 };
 
+type PracticeProgressRecord = {
+  _id: ObjectId;
+  owner_id: ObjectId;
+  kit_id: ObjectId;
+  card_id: string;
+  card_version: string;
+  confidence: PracticeConfidence;
+  review_count: number;
+  last_reviewed_at: Date;
+  reviews: Array<{
+    id: string;
+    confidence: PracticeConfidence;
+    reviewed_at: Date;
+    card_version: string;
+  }>;
+};
+
+function toPracticeRecord(record: PracticeProgressRecord): PracticeRecord {
+  return {
+    ownerId: record.owner_id.toHexString(),
+    kitId: record.kit_id.toHexString(),
+    cardId: record.card_id,
+    cardVersion: record.card_version,
+    confidence: record.confidence,
+    reviewCount: record.review_count,
+    lastReviewedAt: record.last_reviewed_at,
+    reviews: record.reviews.map((review): PracticeReview => ({
+      id: review.id,
+      confidence: review.confidence,
+      reviewedAt: review.reviewed_at,
+      cardVersion: review.card_version,
+    })),
+  };
+}
+
 function toRegenerationJob(record: RegenerationRecord): RegenerationJob {
   return {
     id: record._id.toHexString(), ownerId: record.owner_id.toHexString(), kitId: record.kit_id.toHexString(),
@@ -205,6 +242,7 @@ export class MongoPersistence implements Persistence {
   private readonly jobs: Collection<JobRecord>;
   private readonly kits: Collection<KitRecord>;
   private readonly regenerations: Collection<RegenerationRecord>;
+  private readonly practiceProgress: Collection<PracticeProgressRecord>;
   private readonly instanceId = randomUUID();
 
   constructor(uri: string, databaseName: string, connectTimeoutMs: number, private readonly release: string) {
@@ -221,6 +259,7 @@ export class MongoPersistence implements Persistence {
     this.jobs = this.database.collection<JobRecord>("generation_jobs");
     this.kits = this.database.collection<KitRecord>("kits");
     this.regenerations = this.database.collection<RegenerationRecord>("regeneration_jobs");
+    this.practiceProgress = this.database.collection<PracticeProgressRecord>("practice_progress");
   }
 
   async connect(): Promise<void> {
@@ -255,6 +294,10 @@ export class MongoPersistence implements Persistence {
       this.kits.createIndex({ owner_id: 1, updated_at: -1 }, { name: "kits_by_owner" }),
       this.regenerations.createIndex({ status: 1, lease_expires_at: 1, created_at: 1 }, { name: "claimable_regenerations" }),
       this.regenerations.createIndex({ owner_id: 1, kit_id: 1, created_at: -1 }, { name: "regenerations_by_kit" }),
+      this.practiceProgress.createIndex(
+        { owner_id: 1, kit_id: 1, card_id: 1 },
+        { unique: true, name: "unique_practice_card" },
+      ),
     ]);
   }
 
@@ -480,6 +523,56 @@ export class MongoPersistence implements Persistence {
     if (record) return { kind: "updated", kit: toOwnedKit(record) };
     const current = await this.kits.findOne({ _id: id, owner_id: ownerId }, { projection: { revision: 1 } });
     return current ? { kind: "conflict", revision: current.revision } : { kind: "not_found" };
+  }
+
+  async listPracticeRecords(ownerId: string, kitId: string): Promise<PracticeRecord[]> {
+    if (!ObjectId.isValid(ownerId) || !ObjectId.isValid(kitId)) return [];
+    const records = await this.practiceProgress.find({
+      owner_id: new ObjectId(ownerId),
+      kit_id: new ObjectId(kitId),
+    }).toArray();
+    return records.map(toPracticeRecord);
+  }
+
+  async recordPracticeReview(input: {
+    ownerId: string;
+    kitId: string;
+    cardId: string;
+    cardVersion: string;
+    reviewId: string;
+    confidence: PracticeConfidence;
+    now: Date;
+  }): Promise<PracticeRecord> {
+    const ownerId = new ObjectId(input.ownerId);
+    const kitId = new ObjectId(input.kitId);
+    const review = {
+      id: input.reviewId,
+      confidence: input.confidence,
+      reviewed_at: input.now,
+      card_version: input.cardVersion,
+    };
+    try {
+      const record = await this.practiceProgress.findOneAndUpdate(
+        { owner_id: ownerId, kit_id: kitId, card_id: input.cardId, "reviews.id": { $ne: input.reviewId } },
+        {
+          $setOnInsert: { _id: new ObjectId(), owner_id: ownerId, kit_id: kitId, card_id: input.cardId },
+          $set: {
+            card_version: input.cardVersion,
+            confidence: input.confidence,
+            last_reviewed_at: input.now,
+          },
+          $inc: { review_count: 1 },
+          $push: { reviews: review },
+        },
+        { upsert: true, returnDocument: "after" },
+      );
+      if (record) return toPracticeRecord(record);
+    } catch (error) {
+      if (!(error instanceof MongoServerError) || error.code !== 11_000) throw error;
+    }
+    const existing = await this.practiceProgress.findOne({ owner_id: ownerId, kit_id: kitId, card_id: input.cardId });
+    if (!existing) throw new Error("Practice review could not be persisted.");
+    return toPracticeRecord(existing);
   }
 
   async enqueueRegeneration(input: {

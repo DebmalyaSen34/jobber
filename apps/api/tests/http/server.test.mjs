@@ -9,6 +9,7 @@ class MemoryPersistence {
   sessions = new Map();
   jobs = new Map();
   kits = new Map();
+  practiceRecords = new Map();
   nextUserId = 1;
   nextJobId = 1;
 
@@ -103,6 +104,26 @@ class MemoryPersistence {
     kit.revision += 1;
     kit.updatedAt = input.now;
     return { kind: "updated", kit };
+  }
+
+  async listPracticeRecords(ownerId, kitId) {
+    return [...this.practiceRecords.values()].filter((record) => record.ownerId === ownerId && record.kitId === kitId);
+  }
+
+  async recordPracticeReview(input) {
+    const key = `${input.ownerId}:${input.kitId}:${input.cardId}`;
+    const prior = this.practiceRecords.get(key);
+    if (prior?.reviews.some(({ id }) => id === input.reviewId)) return prior;
+    const next = {
+      ownerId: input.ownerId, kitId: input.kitId, cardId: input.cardId,
+      cardVersion: input.cardVersion, confidence: input.confidence,
+      reviewCount: (prior?.reviewCount ?? 0) + 1, lastReviewedAt: input.now,
+      reviews: [...(prior?.reviews ?? []), {
+        id: input.reviewId, confidence: input.confidence, reviewedAt: input.now, cardVersion: input.cardVersion,
+      }],
+    };
+    this.practiceRecords.set(key, next);
+    return next;
   }
 
   async retryOwnedJob(ownerId, jobId, now) {
@@ -409,6 +430,9 @@ test("HTTP job flow enforces CSRF, active deduplication, validation, and ownersh
       answer_outline: "Explain validation and inference.",
       difficulty: 2,
     }];
+    editedContent.flashcards = [{
+      id: "manual-card-1", front: "What is a type boundary?", back: "A validation boundary between typed and untyped data.", requirement_ids: ["manual-r1"],
+    }];
     editedContent.schedule.days = Array.from({ length: 5 }, (_, index) => ({
       day: index + 1,
       focus: index === 0 ? "Type boundaries" : "Review",
@@ -430,6 +454,32 @@ test("HTTP job flow enforces CSRF, active deduplication, validation, and ownersh
     assert.equal(savedBody.kit.revision, 2);
     assert.equal(savedBody.kit.content.company_brief.summary, "A user-edited summary.");
     assert.deepEqual(savedBody.kit.content.coverage.uncovered_requirement_ids, []);
+
+    const initialPractice = await fetch(`${origin}/api/v1/kits/${queuedBody.job.kitId}/practice`, {
+      headers: { Cookie: ownerA.cookie },
+    });
+    assert.equal(initialPractice.status, 200);
+    assert.deepEqual((await initialPractice.json()).practice.counts, { unseen: 1, reviewed: 0, total: 1 });
+
+    const rejectedReview = await fetch(`${origin}/api/v1/kits/${queuedBody.job.kitId}/practice/reviews`, {
+      method: "POST",
+      headers: { Cookie: ownerA.cookie, Origin: browserOrigin, "Content-Type": "application/json" },
+      body: JSON.stringify({ review_id: "00000000-0000-4000-8000-000000000001", card_id: "manual-card-1", confidence: "unsure" }),
+    });
+    assert.equal(rejectedReview.status, 403);
+
+    const recordedReview = await fetch(`${origin}/api/v1/kits/${queuedBody.job.kitId}/practice/reviews`, {
+      method: "POST",
+      headers: { Cookie: ownerA.cookie, Origin: browserOrigin, "Content-Type": "application/json", "X-CSRF-Token": ownerA.body.csrfToken },
+      body: JSON.stringify({ review_id: "00000000-0000-4000-8000-000000000001", card_id: "manual-card-1", confidence: "unsure" }),
+    });
+    assert.equal(recordedReview.status, 201);
+    assert.deepEqual((await recordedReview.json()).practice.counts, { unseen: 0, reviewed: 1, total: 1 });
+
+    const hiddenPractice = await fetch(`${origin}/api/v1/kits/${queuedBody.job.kitId}/practice`, {
+      headers: { Cookie: ownerB.cookie },
+    });
+    assert.equal(hiddenPractice.status, 404);
 
     const staleSave = await fetch(`${origin}/api/v1/kits/${queuedBody.job.kitId}`, {
       method: "PATCH",

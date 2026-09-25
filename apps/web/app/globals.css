@@ -10,6 +10,9 @@
   --accent-dark: #365a27;
   --danger: #a63d2f;
   --focus: #176b87;
+  --caution: #795315;
+  --caution-surface: #fff4d6;
+  --confidence-surface: #edf5e1;
 }
 
 * { box-sizing: border-box; }
@@ -484,11 +487,44 @@ code { padding: 0.12em 0.35em; border-radius: 5px; color: var(--ink); background
 .health-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
 .health-actions .small-button { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
 .health-actions > span { color: var(--ink-soft); font-size: 0.75rem; line-height: 1.4; }
+.practice-section { align-items: start; }
+.practice-intro { max-width: 680px; margin: 8px 0 24px; color: var(--ink-soft); line-height: 1.65; }
+.practice-loading { min-height: 72px; display: flex; align-items: center; gap: 10px; color: var(--ink-soft); }
+.practice-counts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 20px 0; }
+.practice-counts div { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 64px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 11px; background: rgba(255, 255, 255, 0.58); }
+.practice-counts span { color: var(--ink-soft); font-size: 0.78rem; font-weight: 750; }
+.practice-counts strong { font-family: Georgia, "Times New Roman", serif; font-size: 1.55rem; font-weight: 500; }
+.practice-player { max-width: 780px; margin-top: 24px; }
+.practice-progress { display: grid; grid-template-columns: auto minmax(100px, 1fr) auto; gap: 14px; align-items: center; margin-bottom: 10px; color: var(--ink-soft); font-size: 0.75rem; font-weight: 750; }
+.practice-progress progress { width: 100%; height: 8px; overflow: hidden; border: 0; border-radius: 999px; accent-color: var(--accent-dark); background: var(--line); }
+.practice-card { min-height: 360px; display: flex; flex-direction: column; justify-content: center; padding: clamp(24px, 5vw, 48px); border: 1px solid #b9c6b4; border-radius: 20px; background: var(--paper-strong); box-shadow: 0 18px 50px rgba(18, 37, 34, 0.08); }
+.practice-card > h3 { max-width: 620px; margin: 10px 0 30px; font-family: Georgia, "Times New Roman", serif; font-size: clamp(1.65rem, 4vw, 2.55rem); font-weight: 500; line-height: 1.18; }
+.practice-reveal-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; margin-top: auto; }
+.practice-reveal-actions .text-link, .practice-session-footer .text-link { padding: 0 4px; border: 0; background: transparent; cursor: pointer; }
+.practice-answer { padding-top: 24px; border-top: 1px solid var(--line); animation: practice-answer-in 220ms ease-out both; }
+.practice-answer > p:not(.flashcard__label) { max-width: 650px; margin: 8px 0 28px; color: var(--ink-soft); font-size: 1rem; line-height: 1.7; white-space: pre-wrap; }
+.confidence-controls { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 0; padding: 0; border: 0; }
+.confidence-controls legend { grid-column: 1 / -1; margin-bottom: 6px; font-size: 0.84rem; font-weight: 800; }
+.confidence-button { min-height: 88px; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 5px; padding: 13px 15px; border: 1px solid var(--line); border-radius: 12px; color: var(--ink); background: var(--paper); text-align: left; cursor: pointer; transition: border-color 180ms ease-out, background 180ms ease-out; }
+.confidence-button strong { display: flex; align-items: center; gap: 7px; font-size: 0.92rem; }
+.confidence-button span { color: var(--ink-soft); font-size: 0.72rem; line-height: 1.4; }
+.confidence-button--again { border-color: color-mix(in srgb, var(--danger) 45%, var(--line)); }
+.confidence-button--again:hover { background: color-mix(in srgb, var(--danger) 8%, var(--paper-strong)); }
+.confidence-button--unsure { border-color: color-mix(in srgb, var(--caution) 45%, var(--line)); }
+.confidence-button--unsure:hover { background: var(--caution-surface); }
+.confidence-button--confident { border-color: color-mix(in srgb, var(--accent-dark) 45%, var(--line)); }
+.confidence-button--confident:hover { background: var(--confidence-surface); }
+.confidence-controls:disabled .confidence-button { cursor: wait; opacity: 0.62; }
+.practice-session-footer { min-height: 52px; display: flex; align-items: center; justify-content: space-between; gap: 16px; color: var(--ink-soft); font-size: 0.78rem; }
+.practice-complete { display: grid; gap: 5px; max-width: 780px; margin-top: 22px; padding: 18px 20px; border-left: 3px solid var(--accent-dark); background: var(--confidence-surface); }
+.practice-complete span, .practice-message { color: var(--ink-soft); font-size: 0.82rem; line-height: 1.5; }
+@keyframes practice-answer-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 
 @media (prefers-reduced-motion: reduce) {
   .live-label span { animation: none; }
   .kit-card { transition: none; }
   .status-chip::before, .activity-strip span, .stage-progress__step::after, .stage--current .stage__marker, .stage--current::before { animation: none; }
+  .practice-answer { animation: none; }
 }
 
 @media (max-width: 900px) {
@@ -532,6 +568,13 @@ code { padding: 0.12em 0.35em; border-radius: 5px; color: var(--ink); background
   .health-metrics { grid-template-columns: 1fr; }
   .health-actions { align-items: stretch; flex-direction: column; }
   .health-actions .small-button { width: 100%; }
+  .practice-counts, .confidence-controls { grid-template-columns: 1fr; }
+  .practice-progress { grid-template-columns: 1fr; gap: 8px; }
+  .practice-progress span:last-child { justify-self: start; }
+  .practice-card { min-height: 390px; padding: 24px 20px; }
+  .practice-reveal-actions { align-items: stretch; flex-direction: column; }
+  .practice-reveal-actions .primary-button, .practice-reveal-actions .text-link { width: 100%; justify-content: center; }
+  .practice-session-footer { align-items: stretch; flex-direction: column; padding-top: 12px; }
   .schedule-day--editing { grid-template-columns: 48px minmax(0, 1fr); }
   .schedule-day--editing .editor-field--minutes { grid-column: 2; width: 100%; }
 }

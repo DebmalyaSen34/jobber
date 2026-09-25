@@ -4,5 +4,6 @@ export * from "./pipeline/generate-kit.js";
 export * from "./evaluation/run-batch.js";
 export * from "./coverage/check-coverage.js";
 export * from "./coverage/derive-kit-state.js";
+export * from "./practice/order-practice.js";
 export * from "./scheduling/allocate-schedule.js";
 export * from "./validation/validate-kit.js";

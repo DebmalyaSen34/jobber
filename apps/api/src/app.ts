@@ -6,6 +6,7 @@ import type { Persistence } from "./database.js";
 import { JobError, JobService, publicJob } from "./jobs.js";
 import { KitEditError, KitService, publicKit, publicKitSummary } from "./kits.js";
 import { RegenerationError, RegenerationService, publicRegeneration } from "./regenerations.js";
+import { PracticeError, PracticeService } from "./practice.js";
 
 const DEVELOPMENT_SESSION_COOKIE = "jobber_session";
 const PRODUCTION_SESSION_COOKIE = "__Host-jobber_session";
@@ -85,6 +86,7 @@ export function createApp(
   });
   const kits = new KitService(persistence);
   const regenerations = new RegenerationService(persistence);
+  const practice = new PracticeService(persistence);
 
   const requireMutationOrigin = (request: Request): void => {
     const origin = request.header("origin");
@@ -262,6 +264,19 @@ export function createApp(
     response.status(202).json({ regeneration: publicRegeneration(job) });
   });
 
+  app.get("/api/v1/kits/:kitId/practice", async (request, response) => {
+    const session = await resolveAuthenticatedSession(request, response);
+    response.json({ practice: await practice.get(session.user.id, request.params.kitId) });
+  });
+
+  app.post("/api/v1/kits/:kitId/practice/reviews", async (request, response) => {
+    requireMutationOrigin(request);
+    const session = await resolveAuthenticatedSession(request, response);
+    auth.verifyCsrf(session, request.header("x-csrf-token"));
+    const result = await practice.review(session.user.id, request.params.kitId, request.body);
+    response.status(201).json({ practice: result });
+  });
+
   app.get("/api/v1/regenerations/:jobId", async (request, response) => {
     const session = await resolveAuthenticatedSession(request, response);
     const job = await regenerations.getOwned(session.user.id, request.params.jobId);
@@ -333,6 +348,10 @@ export function createApp(
       return;
     }
     if (error instanceof RegenerationError) {
+      response.status(error.status).json({ error: { code: error.code, message: error.message } });
+      return;
+    }
+    if (error instanceof PracticeError) {
       response.status(error.status).json({ error: { code: error.code, message: error.message } });
       return;
     }

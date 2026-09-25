@@ -52,6 +52,18 @@ export type Question = {
 };
 
 export type Flashcard = { id: string; front: string; back: string; requirement_ids: string[] };
+export type PracticeConfidence = "again" | "unsure" | "confident";
+export type PracticeSnapshot = {
+  kitId: string;
+  progress: Array<{
+    cardId: string;
+    confidence: PracticeConfidence | null;
+    reviewCount: number;
+    lastReviewedAt: string | null;
+  }>;
+  orderedCardIds: string[];
+  counts: { unseen: number; reviewed: number; total: number };
+};
 export type ScheduleDay = { day: number; focus: string; question_ids: string[]; minutes: number };
 export type ContentMetadata = {
   origin: "generated" | "manual";

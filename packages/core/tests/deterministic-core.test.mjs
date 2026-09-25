@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { allocateSchedule, checkCoverage, deriveKitState, validateKit, runBatch } from "../dist/index.js";
+import { allocateSchedule, checkCoverage, deriveKitState, orderPracticeCards, validateKit, runBatch } from "../dist/index.js";
 
 const requirement = (id, priority = "must") => ({ id, text: `Requirement ${id}`, kind: "technical", priority });
 const question = (id, requirement_ids, difficulty = 2) => ({ id, requirement_ids, difficulty, category: "technical", prompt: `Explain ${id}`, answer_outline: "Discuss trade-offs." });
@@ -50,6 +50,20 @@ test("derived state distinguishes content gaps from schedule repair needs", () =
   const missingMust = deriveKitState(kit);
   assert.deepEqual(missingMust.covered_but_unscheduled_must_requirement_ids, ["r1", "r2"]);
   assert.deepEqual(missingMust.schedule_reasons, ["UNSCHEDULED_QUESTIONS", "UNSCHEDULED_MUST_REQUIREMENTS"]);
+});
+
+test("practice ordering prioritizes Again, unseen, Unsure, and Confident with deterministic ties", () => {
+  const states = [
+    { card_id: "confident", confidence: "confident", last_reviewed_at: "2026-09-24T12:00:00.000Z" },
+    { card_id: "unseen-b", confidence: null, last_reviewed_at: null },
+    { card_id: "again-new", confidence: "again", last_reviewed_at: "2026-09-25T12:00:00.000Z" },
+    { card_id: "unsure", confidence: "unsure", last_reviewed_at: "2026-09-23T12:00:00.000Z" },
+    { card_id: "again-old", confidence: "again", last_reviewed_at: "2026-09-22T12:00:00.000Z" },
+    { card_id: "unseen-a", confidence: null, last_reviewed_at: null },
+  ];
+  const expected = ["again-old", "again-new", "unseen-a", "unseen-b", "unsure", "confident"];
+  assert.deepEqual(orderPracticeCards(states), expected);
+  assert.deepEqual(orderPracticeCards([...states].reverse()), expected);
 });
 
 test("one-day schedule includes all questions and their full estimated workload", () => {
