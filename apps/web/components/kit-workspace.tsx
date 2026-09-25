@@ -6,6 +6,7 @@ import {
   readApiError,
   stageLabel,
   type OwnedKit,
+  type KitDerivedState,
   type PublicRegeneration,
   type Question,
   type Requirement,
@@ -63,6 +64,36 @@ function rebaseLocalDraft(base: KitContent, local: KitContent, remote: KitConten
   next.flashcards = rebaseCollection(base.flashcards, local.flashcards, remote.flashcards);
   if (!same(base.schedule, local.schedule)) next.schedule = structuredClone(local.schedule);
   return next;
+}
+
+function deriveDraftState(content: KitContent): KitDerivedState {
+  const requirementIds = new Set(content.role.requirements.map(({ id }) => id));
+  const covered = new Set(content.questions.flatMap(({ requirement_ids }) => requirement_ids).filter((id) => requirementIds.has(id)));
+  const uncovered = content.role.requirements.filter(({ id }) => !covered.has(id)).map(({ id }) => id);
+  const uncoveredMust = content.role.requirements.filter(({ id, priority }) => priority === "must" && !covered.has(id)).map(({ id }) => id);
+  const questionIds = new Set(content.questions.map(({ id }) => id));
+  const scheduledIds = [...new Set(content.schedule.days.flatMap(({ question_ids }) => question_ids))].filter((id) => questionIds.has(id));
+  const scheduled = new Set(scheduledIds);
+  const scheduledRequirementIds = new Set(content.questions
+    .filter(({ id }) => scheduled.has(id))
+    .flatMap(({ requirement_ids }) => requirement_ids));
+  const coveredButUnscheduledMust = content.role.requirements
+    .filter(({ id, priority }) => priority === "must" && covered.has(id) && !scheduledRequirementIds.has(id))
+    .map(({ id }) => id);
+  const unscheduledQuestions = content.questions.filter(({ id }) => !scheduled.has(id)).map(({ id }) => id);
+  const scheduleReasons: KitDerivedState["schedule_reasons"] = [];
+  if (unscheduledQuestions.length > 0) scheduleReasons.push("UNSCHEDULED_QUESTIONS");
+  if (coveredButUnscheduledMust.length > 0) scheduleReasons.push("UNSCHEDULED_MUST_REQUIREMENTS");
+  return {
+    covered_requirement_ids: content.role.requirements.filter(({ id }) => covered.has(id)).map(({ id }) => id),
+    uncovered_requirement_ids: uncovered,
+    uncovered_must_requirement_ids: uncoveredMust,
+    scheduled_question_ids: scheduledIds,
+    unscheduled_question_ids: unscheduledQuestions,
+    covered_but_unscheduled_must_requirement_ids: coveredButUnscheduledMust,
+    schedule_needs_regeneration: scheduleReasons.length > 0,
+    schedule_reasons: scheduleReasons,
+  };
 }
 
 function manualId(prefix: string): string {
@@ -186,6 +217,12 @@ export function KitWorkspace({ kitId }: { kitId: string }) {
   })).filter(({ questions }) => editing || questions.length > 0), [draft, editing]);
   const requirementOptions = useMemo(() => draft?.role.requirements.map((item) => ({ id: item.id, label: item.text })) ?? [], [draft]);
   const questionOptions = useMemo(() => draft?.questions.map((item) => ({ id: item.id, label: item.prompt })) ?? [], [draft]);
+  const derivedState = useMemo(() => draft ? deriveDraftState(draft) : kit?.derivedState, [draft, kit?.derivedState]);
+  const reconciliationTotal = kit ? (
+    kit.reconciliation.removedQuestionRequirementLinks
+      + kit.reconciliation.removedFlashcardRequirementLinks
+      + kit.reconciliation.removedScheduleQuestionLinks
+  ) : 0;
 
   function startEditing() {
     if (!kit) return;
@@ -226,7 +263,12 @@ export function KitWorkspace({ kitId }: { kitId: string }) {
       setDraft(copyContent(body.kit.content));
       setPinnedQuestionIds(Object.entries(body.kit.metadata.questions).filter(([, value]) => value.pinned).map(([id]) => id));
       setSaveState("saved");
-      setSaveMessage(`Saved revision ${body.kit.revision}.`);
+      const cleaned = body.kit.reconciliation.removedQuestionRequirementLinks
+        + body.kit.reconciliation.removedFlashcardRequirementLinks
+        + body.kit.reconciliation.removedScheduleQuestionLinks;
+      setSaveMessage(cleaned > 0
+        ? `Saved revision ${body.kit.revision}. Removed ${cleaned} stale ${cleaned === 1 ? "reference" : "references"}.`
+        : `Saved revision ${body.kit.revision}. Coverage and schedule checks are up to date.`);
     } catch (caught) {
       const message = caught instanceof Error && caught.message ? caught.message : "Your changes could not be saved.";
       setSaveMessage(message);
@@ -354,6 +396,26 @@ export function KitWorkspace({ kitId }: { kitId: string }) {
           {regenerationMessage && <p className="editor-note" aria-live="polite">{regenerating && <InlineSpinner />} {regenerationMessage}</p>}
         </div>
 
+        {derivedState && <section className={`kit-health ${derivedState.uncovered_requirement_ids.length > 0 || derivedState.schedule_needs_regeneration ? "kit-health--attention" : "kit-health--ready"}`} aria-labelledby="kit-health-heading">
+          <div className="kit-health__header">
+            <div><p className="eyebrow">{dirty ? "Unsaved health preview" : "Saved kit health"}</p><h2 id="kit-health-heading">{derivedState.uncovered_requirement_ids.length > 0 || derivedState.schedule_needs_regeneration ? "A few areas need attention." : "Coverage and schedule are in sync."}</h2></div>
+            <span className="health-status">{dirty ? "Preview" : derivedState.schedule_needs_regeneration || derivedState.uncovered_requirement_ids.length > 0 ? "Action needed" : "Up to date"}</span>
+          </div>
+          <div className="health-metrics">
+            <div><span>Uncovered requirements</span><strong>{derivedState.uncovered_requirement_ids.length}</strong></div>
+            <div><span>Uncovered must-haves</span><strong>{derivedState.uncovered_must_requirement_ids.length}</strong></div>
+            <div><span>Unscheduled questions</span><strong>{derivedState.unscheduled_question_ids.length}</strong></div>
+          </div>
+          {derivedState.uncovered_requirement_ids.length > 0 && <div className="health-detail"><strong>Question coverage gaps</strong><p>These requirements currently have no linked interview question:</p><ul>{derivedState.uncovered_requirement_ids.map((id) => <li key={id}>{requirementById.get(id)?.text ?? id}{derivedState.uncovered_must_requirement_ids.includes(id) ? <span>Must-have</span> : null}</li>)}</ul></div>}
+          {derivedState.schedule_needs_regeneration && <div className="health-detail"><strong>Schedule repair recommended</strong><p>{derivedState.unscheduled_question_ids.length > 0 ? `${derivedState.unscheduled_question_ids.length} ${derivedState.unscheduled_question_ids.length === 1 ? "question is" : "questions are"} missing from the plan. ` : ""}{derivedState.covered_but_unscheduled_must_requirement_ids.length > 0 ? `${derivedState.covered_but_unscheduled_must_requirement_ids.length} covered must-have ${derivedState.covered_but_unscheduled_must_requirement_ids.length === 1 ? "requirement is" : "requirements are"} absent from scheduled practice.` : ""}</p></div>}
+          {reconciliationTotal > 0 && kit && kit.reconciliation.revision === kit.revision && <p className="health-reconciliation" role="status">The last save safely removed {reconciliationTotal} stale {reconciliationTotal === 1 ? "reference" : "references"} after content was deleted.</p>}
+          {(derivedState.uncovered_requirement_ids.length > 0 || derivedState.schedule_needs_regeneration) && <div className="health-actions">
+            {derivedState.uncovered_requirement_ids.length > 0 && <a className="small-button" href="#questions">Review question coverage</a>}
+            {derivedState.schedule_needs_regeneration && <button className="small-button button-with-spinner" type="button" disabled={dirty || Boolean(regenerating) || derivedState.uncovered_must_requirement_ids.length > 0} aria-describedby={dirty || derivedState.uncovered_must_requirement_ids.length > 0 ? "schedule-repair-help" : undefined} onClick={() => void regenerate({ type: "schedule" })}>{regenerating === "schedule" && <InlineSpinner />}{regenerating === "schedule" ? "Repairing…" : "Repair schedule"}</button>}
+            {(dirty || derivedState.uncovered_must_requirement_ids.length > 0) && derivedState.schedule_needs_regeneration && <span id="schedule-repair-help">{dirty ? "Save the preview first to enable schedule repair." : "Cover the must-have requirement gaps before repairing the schedule."}</span>}
+          </div>}
+        </section>}
+
         <section className="kit-section company-section" id="company" aria-labelledby="company-heading">
           <div className="section-number">01</div><div><p className="eyebrow">Company brief</p><div className="editor-heading"><h2 id="company-heading">Know the context.</h2><button className="small-button button-with-spinner" type="button" disabled={dirty || Boolean(regenerating)} onClick={() => void regenerate({ type: "company-brief" })}>{regenerating === "company-brief" && <InlineSpinner />}{regenerating === "company-brief" ? "Regenerating…" : "Regenerate brief"}</button></div>
             {editing ? <div className="editor-stack"><label className="editor-field"><span>Summary</span><textarea rows={4} value={draft.company_brief.summary} onChange={(event) => updateDraft((next) => { next.company_brief.summary = event.target.value; })} /></label><label className="editor-field"><span>What they do</span><textarea rows={5} value={draft.company_brief.what_they_do} onChange={(event) => updateDraft((next) => { next.company_brief.what_they_do = event.target.value; })} /></label></div> : <><p className="section-lede">{draft.company_brief.summary || "No reliable company summary was available."}</p>{draft.company_brief.what_they_do && <p>{draft.company_brief.what_they_do}</p>}</>}
@@ -389,12 +451,12 @@ export function KitWorkspace({ kitId }: { kitId: string }) {
         </section>
 
         <section className="kit-section" id="schedule" aria-labelledby="schedule-heading">
-          <div className="section-number">05</div><div><p className="eyebrow">Study schedule</p><div className="editor-heading"><h2 id="schedule-heading">A plan for every available day.</h2><button className="small-button button-with-spinner" type="button" disabled={dirty || Boolean(regenerating)} onClick={() => void regenerate({ type: "schedule" })}>{regenerating === "schedule" && <InlineSpinner />}{regenerating === "schedule" ? "Regenerating…" : "Regenerate schedule"}</button></div><ol className="schedule-list">{draft.schedule.days.map((day, index) => <li className={editing ? "schedule-day--editing" : ""} key={day.day}><div className="day-marker"><span>Day</span><strong>{day.day}</strong></div><div>{editing ? <div className="editor-stack"><label className="editor-field"><span>Focus</span><input value={day.focus} onChange={(event) => updateDraft((next) => { next.schedule.days[index]!.focus = event.target.value; })} /></label><ReferenceChecks legend="Assigned questions" options={questionOptions} selected={day.question_ids} onChange={(ids) => updateDraft((next) => { next.schedule.days[index]!.question_ids = ids; })} /></div> : <><h3>{day.focus || "Review and consolidate"}</h3><p>{day.question_ids.length > 0 ? day.question_ids.map((id) => questionById.get(id)?.prompt ?? id).join(" · ") : "No new material scheduled; use this day to review."}</p></>}</div>{editing ? <label className="editor-field editor-field--minutes"><span>Minutes</span><input type="number" inputMode="numeric" min="0" step="1" value={day.minutes} onChange={(event) => updateDraft((next) => { next.schedule.days[index]!.minutes = Math.max(0, Number.parseInt(event.target.value || "0", 10)); })} /></label> : <span className="minutes">{day.minutes} min</span>}</li>)}</ol></div>
+          <div className="section-number">05</div><div><p className="eyebrow">Study schedule</p><div className="editor-heading"><h2 id="schedule-heading">A plan for every available day.</h2><button className="small-button button-with-spinner" type="button" disabled={dirty || Boolean(regenerating) || Boolean(derivedState?.uncovered_must_requirement_ids.length)} onClick={() => void regenerate({ type: "schedule" })}>{regenerating === "schedule" && <InlineSpinner />}{regenerating === "schedule" ? "Regenerating…" : derivedState?.schedule_needs_regeneration ? "Repair schedule" : "Regenerate schedule"}</button></div><ol className="schedule-list">{draft.schedule.days.map((day, index) => <li className={editing ? "schedule-day--editing" : ""} key={day.day}><div className="day-marker"><span>Day</span><strong>{day.day}</strong></div><div>{editing ? <div className="editor-stack"><label className="editor-field"><span>Focus</span><input value={day.focus} onChange={(event) => updateDraft((next) => { next.schedule.days[index]!.focus = event.target.value; })} /></label><ReferenceChecks legend="Assigned questions" options={questionOptions} selected={day.question_ids} onChange={(ids) => updateDraft((next) => { next.schedule.days[index]!.question_ids = ids; })} /></div> : <><h3>{day.focus || "Review and consolidate"}</h3><p>{day.question_ids.length > 0 ? day.question_ids.map((id) => questionById.get(id)?.prompt ?? id).join(" · ") : "No new material scheduled; use this day to review."}</p></>}</div>{editing ? <label className="editor-field editor-field--minutes"><span>Minutes</span><input type="number" inputMode="numeric" min="0" step="1" value={day.minutes} onChange={(event) => updateDraft((next) => { next.schedule.days[index]!.minutes = Math.max(0, Number.parseInt(event.target.value || "0", 10)); })} /></label> : <span className="minutes">{day.minutes} min</span>}</li>)}</ol></div>
         </section>
 
         <section className="kit-section" id="evidence" aria-labelledby="evidence-heading">
-          <div className="section-number">06</div><div><p className="eyebrow">Sources & coverage</p><h2 id="evidence-heading">What supports this kit.</h2><div className="evidence-grid"><div><span>Coverage passes</span><strong>{draft.coverage.passes}</strong></div><div><span>Last saved gaps</span><strong>{draft.coverage.uncovered_requirement_ids.length}</strong></div><div><span>Last updated</span><strong>{kit ? formatDate(kit.updatedAt) : "—"}</strong></div></div>
-            {editing && <p className="editor-note">Coverage is recalculated by the server when you save. Source URLs and generation evidence remain read-only.</p>}
+          <div className="section-number">06</div><div><p className="eyebrow">Sources & coverage</p><h2 id="evidence-heading">What supports this kit.</h2><div className="evidence-grid"><div><span>Coverage passes</span><strong>{draft.coverage.passes}</strong></div><div><span>{dirty ? "Preview gaps" : "Saved gaps"}</span><strong>{derivedState?.uncovered_requirement_ids.length ?? 0}</strong></div><div><span>Last updated</span><strong>{kit ? formatDate(kit.updatedAt) : "—"}</strong></div></div>
+            {editing && <p className="editor-note">Coverage and schedule health update locally as you edit, then the server verifies them when you save. Source URLs and generation evidence remain read-only.</p>}
             <ul className="source-list"><li><a href={draft.source.company_url} target="_blank" rel="noreferrer">Original company URL</a></li>{[...new Set([...draft.source.pages_used, ...draft.company_brief.sources])].map((source) => <li key={source}><a href={source} target="_blank" rel="noreferrer">{source}</a></li>)}</ul>
             {draft.source.pages_used.length === 0 && draft.company_brief.sources.length === 0 && <p className="section-empty">No public pages were used. This kit is based on the supplied job description.</p>}
           </div>

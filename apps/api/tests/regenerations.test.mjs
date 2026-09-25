@@ -46,7 +46,7 @@ class MemoryRegenerationStore {
   async updateOwnedKit(input) {
     if (input.ownerId !== this.kit.ownerId || input.kitId !== this.kit.id) return { kind: "not_found" };
     if (input.expectedRevision !== this.kit.revision) return { kind: "conflict", revision: this.kit.revision };
-    this.kit = { ...this.kit, content: input.content, metadata: input.metadata, tombstones: input.tombstones, revision: this.kit.revision + 1, updatedAt: input.now };
+    this.kit = { ...this.kit, content: input.content, metadata: input.metadata, tombstones: input.tombstones, lastReconciliation: input.reconciliation, revision: this.kit.revision + 1, updatedAt: input.now };
     return { kind: "updated", kit: structuredClone(this.kit) };
   }
   async enqueueRegeneration(input) {

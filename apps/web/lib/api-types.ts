@@ -61,6 +61,17 @@ export type ContentMetadata = {
   generationRunId: string | null;
 };
 
+export type KitDerivedState = {
+  covered_requirement_ids: string[];
+  uncovered_requirement_ids: string[];
+  uncovered_must_requirement_ids: string[];
+  scheduled_question_ids: string[];
+  unscheduled_question_ids: string[];
+  covered_but_unscheduled_must_requirement_ids: string[];
+  schedule_needs_regeneration: boolean;
+  schedule_reasons: Array<"UNSCHEDULED_QUESTIONS" | "UNSCHEDULED_MUST_REQUIREMENTS">;
+};
+
 export type OwnedKit = KitSummary & {
   originalInput: { jd: string; companyUrl: string; days: number };
   content: {
@@ -95,6 +106,13 @@ export type OwnedKit = KitSummary & {
     requirements: Record<string, ContentMetadata>;
     questions: Record<string, ContentMetadata>;
     flashcards: Record<string, ContentMetadata>;
+  };
+  derivedState: KitDerivedState;
+  reconciliation: {
+    revision: number;
+    removedQuestionRequirementLinks: number;
+    removedFlashcardRequirementLinks: number;
+    removedScheduleQuestionLinks: number;
   };
 };
 

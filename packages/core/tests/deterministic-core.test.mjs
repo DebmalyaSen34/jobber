@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { allocateSchedule, checkCoverage, validateKit, runBatch } from "../dist/index.js";
+import { allocateSchedule, checkCoverage, deriveKitState, validateKit, runBatch } from "../dist/index.js";
 
 const requirement = (id, priority = "must") => ({ id, text: `Requirement ${id}`, kind: "technical", priority });
 const question = (id, requirement_ids, difficulty = 2) => ({ id, requirement_ids, difficulty, category: "technical", prompt: `Explain ${id}`, answer_outline: "Discuss trade-offs." });
@@ -32,6 +32,24 @@ test("coverage rejects unknown references, duplicate entities, and invalid shape
   assert.throws(() => checkCoverage([...requirements, requirements[0]], questions), /Duplicate requirement/);
   assert.throws(() => checkCoverage(requirements, [...questions, questions[0]]), /Duplicate question/);
   assert.throws(() => checkCoverage(requirements, [question("q", ["r1"], 4)]));
+});
+
+test("derived state distinguishes content gaps from schedule repair needs", () => {
+  const kit = makeKit();
+  kit.questions = kit.questions.filter(({ id }) => id !== "easy");
+  kit.schedule.days.forEach((day) => { day.question_ids = day.question_ids.filter((id) => id !== "easy" && id !== "medium"); });
+  const state = deriveKitState(kit);
+  assert.deepEqual(state.uncovered_requirement_ids, ["r3"]);
+  assert.deepEqual(state.uncovered_must_requirement_ids, []);
+  assert.deepEqual(state.unscheduled_question_ids, ["medium"]);
+  assert.deepEqual(state.covered_but_unscheduled_must_requirement_ids, []);
+  assert.equal(state.schedule_needs_regeneration, true);
+  assert.deepEqual(state.schedule_reasons, ["UNSCHEDULED_QUESTIONS"]);
+
+  kit.schedule.days.forEach((day) => { day.question_ids = []; });
+  const missingMust = deriveKitState(kit);
+  assert.deepEqual(missingMust.covered_but_unscheduled_must_requirement_ids, ["r1", "r2"]);
+  assert.deepEqual(missingMust.schedule_reasons, ["UNSCHEDULED_QUESTIONS", "UNSCHEDULED_MUST_REQUIREMENTS"]);
 });
 
 test("one-day schedule includes all questions and their full estimated workload", () => {

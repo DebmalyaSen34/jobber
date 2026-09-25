@@ -1,6 +1,6 @@
 # Kit editing
 
-M4 tasks 1–2 add durable, owner-scoped editing and safe section regeneration to completed kits.
+M4 tasks 1–3 add durable, owner-scoped editing, safe section regeneration, and explicit derived-state repair to completed kits.
 
 ## Interaction model
 
@@ -18,13 +18,20 @@ The mutation requires the authenticated owner, trusted origin, and session CSRF 
 1. Parses the complete kit shape and positive base revision.
 2. Reloads the owner-scoped current kit.
 3. Preserves server-owned provenance and extension data.
-4. Recomputes requirement coverage from the edited requirements and questions.
-5. Runs relational validation in draft mode. Intentional coverage or scheduling gaps are warnings; malformed structure and dangling references are rejected.
-6. Atomically updates only when the stored revision equals the submitted revision, then increments it.
+4. Removes requirement links whose requirements were deleted and schedule links whose questions were deleted.
+5. Recomputes requirement coverage and schedule health from the reconciled draft.
+6. Runs relational validation in draft mode. Intentional coverage or scheduling gaps are warnings; malformed structure is rejected.
+7. Atomically updates only when the stored revision equals the submitted revision, then increments it.
 
 A stale revision returns `409 KIT_REVISION_CONFLICT`. The browser keeps its local draft and offers an explicit action to discard it and load the latest server revision.
 
-Deleting a requirement removes its links from questions and flashcards. Deleting a question removes its schedule assignments. These immediate reconciliations keep user-driven mutations structurally valid; broader derived-state repair remains M4 task 3.
+The server is authoritative for reconciliation even though the browser also cleans up references immediately. A successful response reports how many question-to-requirement, flashcard-to-requirement, and schedule-to-question links were removed. It never recreates deleted requirements, questions, or flashcards.
+
+## Derived health and schedule repair
+
+The workspace recomputes a local health preview after every edit. It separately displays uncovered requirements, uncovered must-haves, unscheduled questions, and must-have requirements that have questions but no scheduled question. Text labels and counts carry the state; color is supplementary.
+
+After save, the API returns the same derived state calculated from persisted content. A schedule is marked for repair only when existing questions are unscheduled or a covered must-have lacks a scheduled question. A genuinely uncovered must-have is a content gap, so schedule repair remains disabled until the user adds coverage. Repair is an explicit action that reuses persisted schedule regeneration and is available only after local changes are saved; the system does not silently undo intentional deletions.
 
 ## Metadata and safe regeneration
 
@@ -41,6 +48,6 @@ Regeneration controls require the initial local draft to be saved, but editing r
 ## Verification
 
 - The network-free acceptance test starts a category regeneration, applies an edit while generation is blocked, and verifies edited Q1, pinned Q2, manual Q3, and concurrent Q5 survive; deleted Q4 remains absent; unrelated content and all references remain valid.
-- The loopback API suite verifies an authenticated successful edit, coverage recomputation, revision increment, stale-save conflict, and cross-owner 404.
+- The API suites verify authoritative stale-reference removal, coverage and schedule-health recomputation, reconciliation counts, an authenticated successful edit, revision increment, stale-save conflict, and cross-owner 404.
 - The webpack production frontend build passes.
 - A local browser smoke with a temporary mock session verified view/edit states, accessible labels and controls, local dirty state, successful save feedback/revision increment, and question addition without a framework error overlay.

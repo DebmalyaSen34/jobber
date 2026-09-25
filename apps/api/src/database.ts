@@ -13,9 +13,11 @@ import type {
 } from "./jobs.js";
 import {
   initialKitMetadata,
+  emptyReconciliation,
   normalizeKitMetadata,
   type ContentTombstone,
   type KitContentMetadata,
+  type ReferenceReconciliation,
   type KitStore,
   type OwnedKit,
 } from "./kits.js";
@@ -93,6 +95,7 @@ type KitRecord = {
   content: Kit;
   metadata?: KitContentMetadata;
   tombstones?: ContentTombstone[];
+  last_reconciliation?: ReferenceReconciliation;
   revision: number;
   created_at: Date;
   updated_at: Date;
@@ -171,6 +174,7 @@ function toOwnedKit(record: KitRecord): OwnedKit {
     content: record.content,
     metadata: normalizeKitMetadata(record.content, record.metadata, record.source_job_id.toHexString(), record.revision),
     tombstones: record.tombstones ?? [],
+    lastReconciliation: record.last_reconciliation ?? emptyReconciliation(record.revision),
     revision: record.revision,
     createdAt: record.created_at,
     updatedAt: record.updated_at,
@@ -453,6 +457,7 @@ export class MongoPersistence implements Persistence {
     content: Kit;
     metadata: KitContentMetadata;
     tombstones: ContentTombstone[];
+    reconciliation: ReferenceReconciliation;
     now: Date;
   }): Promise<{ kind: "updated"; kit: OwnedKit } | { kind: "not_found" } | { kind: "conflict"; revision: number }> {
     if (!ObjectId.isValid(input.ownerId) || !ObjectId.isValid(input.kitId)) return { kind: "not_found" };
@@ -465,6 +470,7 @@ export class MongoPersistence implements Persistence {
           content: input.content,
           metadata: input.metadata,
           tombstones: input.tombstones,
+          last_reconciliation: input.reconciliation,
           updated_at: input.now,
         },
         $inc: { revision: 1 },
@@ -782,6 +788,7 @@ export class MongoPersistence implements Persistence {
           content: record.result,
           metadata: initialKitMetadata(record.result, record._id.toHexString()),
           tombstones: [],
+          last_reconciliation: emptyReconciliation(1),
           revision: 1,
           created_at: record.completed_at ?? record.updated_at,
           updated_at: record.completed_at ?? record.updated_at,

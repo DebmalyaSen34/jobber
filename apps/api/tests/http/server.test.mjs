@@ -97,6 +97,9 @@ class MemoryPersistence {
     if (!kit) return { kind: "not_found" };
     if (kit.revision !== input.expectedRevision) return { kind: "conflict", revision: kit.revision };
     kit.content = input.content;
+    kit.metadata = input.metadata;
+    kit.tombstones = input.tombstones;
+    kit.lastReconciliation = input.reconciliation;
     kit.revision += 1;
     kit.updatedAt = input.now;
     return { kind: "updated", kit };
@@ -441,9 +444,9 @@ test("HTTP job flow enforces CSRF, active deduplication, validation, and ownersh
     assert.equal(staleSave.status, 409);
     assert.equal((await staleSave.json()).error.code, "KIT_REVISION_CONFLICT");
 
-    const invalidContent = structuredClone(savedBody.kit.content);
-    invalidContent.questions[0].requirement_ids = ["missing-requirement"];
-    const invalidSave = await fetch(`${origin}/api/v1/kits/${queuedBody.job.kitId}`, {
+    const danglingContent = structuredClone(savedBody.kit.content);
+    danglingContent.questions[0].requirement_ids = ["missing-requirement"];
+    const reconciledSave = await fetch(`${origin}/api/v1/kits/${queuedBody.job.kitId}`, {
       method: "PATCH",
       headers: {
         Cookie: ownerA.cookie,
@@ -451,10 +454,13 @@ test("HTTP job flow enforces CSRF, active deduplication, validation, and ownersh
         "Content-Type": "application/json",
         "X-CSRF-Token": ownerA.body.csrfToken,
       },
-      body: JSON.stringify({ revision: 2, content: invalidContent }),
+      body: JSON.stringify({ revision: 2, content: danglingContent }),
     });
-    assert.equal(invalidSave.status, 400);
-    assert.equal((await invalidSave.json()).error.code, "INVALID_KIT_EDIT");
+    assert.equal(reconciledSave.status, 200);
+    const reconciledBody = await reconciledSave.json();
+    assert.deepEqual(reconciledBody.kit.content.questions[0].requirement_ids, []);
+    assert.equal(reconciledBody.kit.reconciliation.removedQuestionRequirementLinks, 1);
+    assert.deepEqual(reconciledBody.kit.derivedState.uncovered_must_requirement_ids, ["manual-r1"]);
 
     const crossOwnerSave = await fetch(`${origin}/api/v1/kits/${queuedBody.job.kitId}`, {
       method: "PATCH",

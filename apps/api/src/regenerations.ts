@@ -6,6 +6,7 @@ import {
 } from "@jobber/core";
 import { z } from "zod";
 import {
+  emptyReconciliation,
   normalizeKitMetadata,
   type ContentMetadata,
   type KitStore,
@@ -235,6 +236,14 @@ export class RegenerationRunner {
           content: validation.data,
           metadata: candidate.metadata,
           tombstones: latest.tombstones,
+          reconciliation: {
+            ...emptyReconciliation(latest.revision + 1),
+            removedScheduleQuestionLinks: Math.max(
+              0,
+              latest.content.schedule.days.reduce((total, day) => total + day.question_ids.length, 0)
+                - candidate.content.schedule.days.reduce((total, day) => total + day.question_ids.length, 0),
+            ),
+          },
           now: this.now(),
         });
         merged = updated.kind === "updated";

@@ -1,4 +1,4 @@
-import { checkCoverage, kitSchema, validateKit, type Kit } from "@jobber/core";
+import { checkCoverage, deriveKitState, kitSchema, validateKit, type Kit } from "@jobber/core";
 import { z } from "zod";
 import type { JobInput } from "./jobs.js";
 
@@ -10,10 +10,27 @@ export type OwnedKit = {
   content: Kit;
   metadata: KitContentMetadata;
   tombstones: ContentTombstone[];
+  lastReconciliation: ReferenceReconciliation;
   revision: number;
   createdAt: Date;
   updatedAt: Date;
 };
+
+export type ReferenceReconciliation = {
+  revision: number;
+  removedQuestionRequirementLinks: number;
+  removedFlashcardRequirementLinks: number;
+  removedScheduleQuestionLinks: number;
+};
+
+export function emptyReconciliation(revision: number): ReferenceReconciliation {
+  return {
+    revision,
+    removedQuestionRequirementLinks: 0,
+    removedFlashcardRequirementLinks: 0,
+    removedScheduleQuestionLinks: 0,
+  };
+}
 
 export type ContentMetadata = {
   origin: "generated" | "manual";
@@ -87,6 +104,7 @@ export interface KitStore {
     content: Kit;
     metadata: KitContentMetadata;
     tombstones: ContentTombstone[];
+    reconciliation: ReferenceReconciliation;
     now: Date;
   }): Promise<{ kind: "updated"; kit: OwnedKit } | { kind: "not_found" } | { kind: "conflict"; revision: number }>;
 }
@@ -119,28 +137,65 @@ function fieldsFromIssues(issues: Array<{ path: PropertyKey[]; message: string }
 }
 
 /** Preserve provenance/extensions while accepting only the public editable kit shape. */
-function mergeEditableContent(current: Kit, edited: Kit): Kit {
-  const coverage = checkCoverage(edited.role.requirements, edited.questions);
+function mergeEditableContent(current: Kit, edited: Kit, revision: number): {
+  content: Kit;
+  reconciliation: ReferenceReconciliation;
+} {
+  const requirementIds = new Set(edited.role.requirements.map(({ id }) => id));
+  const questions = edited.questions.map((question) => ({
+    ...question,
+    requirement_ids: question.requirement_ids.filter((id) => requirementIds.has(id)),
+  }));
+  const flashcards = edited.flashcards.map((card) => ({
+    ...card,
+    requirement_ids: card.requirement_ids.filter((id) => requirementIds.has(id)),
+  }));
+  const questionIds = new Set(questions.map(({ id }) => id));
+  const schedule = {
+    ...edited.schedule,
+    days: edited.schedule.days.map((day) => ({
+      ...day,
+      question_ids: day.question_ids.filter((id) => questionIds.has(id)),
+    })),
+  };
+  const coverage = checkCoverage(edited.role.requirements, questions);
   return {
-    ...current,
-    source: {
-      ...current.source,
-      company: edited.source.company,
-      role: edited.source.role,
-      location: edited.source.location,
+    content: {
+      ...current,
+      source: {
+        ...current.source,
+        company: edited.source.company,
+        role: edited.source.role,
+        location: edited.source.location,
+      },
+      company_brief: {
+        ...current.company_brief,
+        summary: edited.company_brief.summary,
+        what_they_do: edited.company_brief.what_they_do,
+      },
+      role: edited.role,
+      questions,
+      flashcards,
+      schedule,
+      coverage: {
+        ...current.coverage,
+        uncovered_requirement_ids: coverage.uncovered_requirement_ids,
+      },
     },
-    company_brief: {
-      ...current.company_brief,
-      summary: edited.company_brief.summary,
-      what_they_do: edited.company_brief.what_they_do,
-    },
-    role: edited.role,
-    questions: edited.questions,
-    flashcards: edited.flashcards,
-    schedule: edited.schedule,
-    coverage: {
-      ...current.coverage,
-      uncovered_requirement_ids: coverage.uncovered_requirement_ids,
+    reconciliation: {
+      revision,
+      removedQuestionRequirementLinks: edited.questions.reduce(
+        (total, item, index) => total + item.requirement_ids.length - questions[index]!.requirement_ids.length,
+        0,
+      ),
+      removedFlashcardRequirementLinks: edited.flashcards.reduce(
+        (total, item, index) => total + item.requirement_ids.length - flashcards[index]!.requirement_ids.length,
+        0,
+      ),
+      removedScheduleQuestionLinks: edited.schedule.days.reduce(
+        (total, item, index) => total + item.question_ids.length - schedule.days[index]!.question_ids.length,
+        0,
+      ),
     },
   };
 }
@@ -225,8 +280,11 @@ export class KitService {
     const current = await this.store.findOwnedKit(ownerId, kitId);
     if (!current) throw new KitEditError("NOT_FOUND", 404, "Kit not found.");
     let content: Kit;
+    let reconciliation: ReferenceReconciliation;
     try {
-      content = mergeEditableContent(current.content, parsed.data.content);
+      const merged = mergeEditableContent(current.content, parsed.data.content, current.revision + 1);
+      content = merged.content;
+      reconciliation = merged.reconciliation;
     } catch {
       throw new KitEditError("INVALID_KIT_EDIT", 400, "Questions must reference unique, existing requirements.", {
         fields: { "content.questions": "Remove duplicate or unknown requirement links." },
@@ -248,6 +306,7 @@ export class KitService {
       content: validation.data,
       metadata: envelope.metadata,
       tombstones: envelope.tombstones,
+      reconciliation,
       now,
     });
     if (result.kind === "not_found") throw new KitEditError("NOT_FOUND", 404, "Kit not found.");
@@ -301,5 +360,7 @@ export function publicKit(kit: OwnedKit) {
       warnings: Array.isArray(content.warnings) ? content.warnings : [],
     },
     metadata: normalizeKitMetadata(content, kit.metadata, kit.sourceJobId, kit.revision),
+    derivedState: deriveKitState(content),
+    reconciliation: kit.lastReconciliation ?? emptyReconciliation(kit.revision),
   };
 }
