@@ -1,6 +1,6 @@
 # Jobber — AI Interview Prep Kit
 
-Implementation follows the assessment PRD in the parent workspace (`../PRD.md`). **M1, M2, and M3 tasks 1–4 are implemented; the M3 task 4 product flow is complete locally and awaits deployment verification**. The frontend is deployed on Vercel, the MongoDB-backed Express API is deployed on Render, and the production browser-to-API-to-Atlas readiness path is verified. The current code includes persisted authentication, owner-scoped asynchronous generation, a create/upload dashboard, durable progress/retry views, and a readable kit workspace.
+Implementation follows the assessment PRD in the parent workspace (`../PRD.md`). **M1–M4 are implemented.** The frontend is deployed on Vercel, the MongoDB-backed Express API is deployed on Render, and the production browser-to-API-to-Atlas readiness path is verified. The current code includes persisted authentication, owner-scoped asynchronous generation, a create/upload dashboard, durable progress/retry views, a readable and editable kit workspace, safe section regeneration, and persistent flashcard practice.
 
 ## Setup
 
@@ -71,13 +71,15 @@ examples/         Sample batch input (not a live benchmark)
 
 The application includes registration, login, logout, persisted HttpOnly sessions, and an authenticated kit dashboard. Browser API requests remain same-origin through a Vercel-to-Render rewrite. Users can submit one role or upload CLI-shaped JSON cases, reopen durable generation progress, retry failures, read and edit completed kits, and run persistent flashcard practice sessions. See [docs/authentication.md](docs/authentication.md), [docs/jobs.md](docs/jobs.md), [docs/workspace.md](docs/workspace.md), [docs/editing.md](docs/editing.md), [docs/practice.md](docs/practice.md), and [docs/deployment.md](docs/deployment.md).
 
-## Builder editing, regeneration, and practice (M4 tasks 1–4)
+## Builder editing, regeneration, and practice (M4 tasks 1–5)
 
 Completed kits support inline edits to company and role details, responsibilities, requirements, questions, flashcards, and schedule entries. Users can add/delete content, move questions between categories, reorder them with keyboard-accessible controls, pin questions, and change requirement/question assignments. Edits stay local until `Save changes`; the API validates a draft, preserves provenance, derives per-entity metadata and deletion tombstones, recomputes coverage, and performs an atomic owner-scoped revision update. Stale saves retain the local draft and return an explicit conflict.
 
 The company brief, any one question category, and the schedule can be regenerated independently through persisted background jobs. Completion merges against the latest saved kit, protecting manual, edited, pinned, deleted, and concurrently edited content while leaving unrelated sections intact. A live Kit health panel distinguishes content coverage gaps from schedule gaps, previews unsaved edits, reports server-side stale-reference cleanup after save, and offers an explicit schedule repair action without restoring deleted content. See [docs/editing.md](docs/editing.md).
 
 Flashcard practice reveals one saved card at a time and persists `Again`, `Unsure`, or `Confident` only after reveal. Subsequent sessions order Again, unseen, Unsure, then Confident, with oldest-review and stable-ID tie-breaks. Material card edits reset current confidence to unseen while retaining historical reviews. See [docs/practice.md](docs/practice.md).
+
+M4 acceptance QA uses keyboard activation for editor and practice controls, deliberately exercises retryable save failure and stale-revision recovery, and reopens practice to confirm persistence. Real Chrome mobile emulation at 375×812 and 812×375 verifies no page-level horizontal overflow and 44px minimum main action targets. This local QA uses a disposable mock API and does not mutate production data.
 
 Import shared contracts from `@jobber/core`. The package exports compiled ESM and TypeScript declarations; root development/build/check commands build it first. After changing core while the frontend is already running, run `npm run build --workspace=@jobber/core` to refresh its compiled output.
 
