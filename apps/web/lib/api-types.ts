@@ -9,7 +9,7 @@ export type ApiError = {
     code?: string;
     message?: string;
     fields?: Record<string, string>;
-    details?: { existingJobId?: string };
+    details?: { existingJobId?: string; revision?: number };
   };
 };
 
@@ -41,15 +41,18 @@ export type KitSummary = {
   updatedAt: string;
 };
 
-type Requirement = { id: string; text: string; kind: string; priority: "must" | "nice" };
-type Question = {
+export type Requirement = { id: string; text: string; kind: "technical" | "behavioural" | "domain"; priority: "must" | "nice" };
+export type Question = {
   id: string;
   requirement_ids: string[];
-  category: string;
+  category: "technical" | "behavioural" | "system-design" | "company-fit";
   prompt: string;
   answer_outline: string;
   difficulty: 1 | 2 | 3;
 };
+
+export type Flashcard = { id: string; front: string; back: string; requirement_ids: string[] };
+export type ScheduleDay = { day: number; focus: string; question_ids: string[]; minutes: number };
 
 export type OwnedKit = KitSummary & {
   originalInput: { jd: string; companyUrl: string; days: number };
@@ -71,10 +74,10 @@ export type OwnedKit = KitSummary & {
       requirements: Requirement[];
     };
     questions: Question[];
-    flashcards: Array<{ id: string; front: string; back: string; requirement_ids: string[] }>;
+    flashcards: Flashcard[];
     schedule: {
       days_available: number;
-      days: Array<{ day: number; focus: string; question_ids: string[]; minutes: number }>;
+      days: ScheduleDay[];
     };
     coverage: { uncovered_requirement_ids: string[]; passes: number };
     warnings?: Array<{ code: string; message: string; url?: string }>;

@@ -4,7 +4,7 @@ import { AuthError, AuthService, assertOwner, publicUser, type SessionWithUser }
 import type { AppConfig } from "./config.js";
 import type { Persistence } from "./database.js";
 import { JobError, JobService, publicJob } from "./jobs.js";
-import { publicKit, publicKitSummary } from "./kits.js";
+import { KitEditError, KitService, publicKit, publicKitSummary } from "./kits.js";
 
 const DEVELOPMENT_SESSION_COOKIE = "jobber_session";
 const PRODUCTION_SESSION_COOKIE = "__Host-jobber_session";
@@ -82,6 +82,7 @@ export function createApp(
     pipelineVersion: config.pipelineVersion,
     maxAttempts: config.jobMaxAttempts,
   });
+  const kits = new KitService(persistence);
 
   const requireMutationOrigin = (request: Request): void => {
     const origin = request.header("origin");
@@ -241,6 +242,14 @@ export function createApp(
     response.json({ kit: publicKit(kit) });
   });
 
+  app.patch("/api/v1/kits/:kitId", async (request, response) => {
+    requireMutationOrigin(request);
+    const session = await resolveAuthenticatedSession(request, response);
+    auth.verifyCsrf(session, request.header("x-csrf-token"));
+    const kit = await kits.update(session.user.id, request.params.kitId, request.body);
+    response.json({ kit: publicKit(kit) });
+  });
+
   app.get("/api/v1/jobs", async (request, response) => {
     const session = await resolveAuthenticatedSession(request, response);
     const ownedJobs = await jobs.listOwned(session.user.id);
@@ -290,6 +299,17 @@ export function createApp(
           ...(error.options.retryable !== undefined ? { retryable: error.options.retryable } : {}),
           ...(error.options.fields ? { fields: error.options.fields } : {}),
           ...(error.options.existingJobId ? { details: { existingJobId: error.options.existingJobId } } : {}),
+        },
+      });
+      return;
+    }
+    if (error instanceof KitEditError) {
+      response.status(error.status).json({
+        error: {
+          code: error.code,
+          message: error.message,
+          ...(error.options.fields ? { fields: error.options.fields } : {}),
+          ...(error.options.revision !== undefined ? { details: { revision: error.options.revision } } : {}),
         },
       });
       return;

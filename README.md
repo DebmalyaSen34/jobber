@@ -69,7 +69,11 @@ scripts/          TypeScript CLI and integration tests
 examples/         Sample batch input (not a live benchmark)
 ```
 
-The application includes registration, login, logout, persisted HttpOnly sessions, and an authenticated kit dashboard. Browser API requests remain same-origin through a Vercel-to-Render rewrite. Users can submit one role or upload CLI-shaped JSON cases, reopen durable generation progress, retry failures, and read completed kits. See [docs/authentication.md](docs/authentication.md), [docs/jobs.md](docs/jobs.md), [docs/workspace.md](docs/workspace.md), and [docs/deployment.md](docs/deployment.md).
+The application includes registration, login, logout, persisted HttpOnly sessions, and an authenticated kit dashboard. Browser API requests remain same-origin through a Vercel-to-Render rewrite. Users can submit one role or upload CLI-shaped JSON cases, reopen durable generation progress, retry failures, read completed kits, and edit kit content through an explicit local-first save flow. See [docs/authentication.md](docs/authentication.md), [docs/jobs.md](docs/jobs.md), [docs/workspace.md](docs/workspace.md), [docs/editing.md](docs/editing.md), and [docs/deployment.md](docs/deployment.md).
+
+## Builder editing (M4 task 1)
+
+Completed kits support inline edits to company and role details, responsibilities, requirements, questions, flashcards, and schedule entries. Users can add/delete content, move questions between categories, reorder them with keyboard-accessible controls, and change requirement/question assignments. Edits stay local until `Save changes`; the API validates a draft, preserves provenance, recomputes coverage, and performs an atomic owner-scoped revision update. Stale saves retain the local draft and return an explicit conflict. Entity metadata, tombstones, and regeneration-safe merging are intentionally deferred to M4 task 2. See [docs/editing.md](docs/editing.md).
 
 Import shared contracts from `@jobber/core`. The package exports compiled ESM and TypeScript declarations; root development/build/check commands build it first. After changing core while the frontend is already running, run `npm run build --workspace=@jobber/core` to refresh its compiled output.
 

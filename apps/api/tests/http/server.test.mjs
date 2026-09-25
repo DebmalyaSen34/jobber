@@ -92,6 +92,16 @@ class MemoryPersistence {
     return kit?.ownerId === ownerId ? kit : null;
   }
 
+  async updateOwnedKit(input) {
+    const kit = await this.findOwnedKit(input.ownerId, input.kitId);
+    if (!kit) return { kind: "not_found" };
+    if (kit.revision !== input.expectedRevision) return { kind: "conflict", revision: kit.revision };
+    kit.content = input.content;
+    kit.revision += 1;
+    kit.updatedAt = input.now;
+    return { kind: "updated", kit };
+  }
+
   async retryOwnedJob(ownerId, jobId, now) {
     const job = await this.findOwnedJob(ownerId, jobId);
     if (!job || job.status !== "failed") return null;
@@ -380,9 +390,83 @@ test("HTTP job flow enforces CSRF, active deduplication, validation, and ownersh
     assert.equal((await kitList.json()).kits[0].role, "Engineer");
     const ownedKit = await fetch(`${origin}/api/v1/kits/${queuedBody.job.kitId}`, { headers: { Cookie: ownerA.cookie } });
     assert.equal(ownedKit.status, 200);
-    assert.equal((await ownedKit.json()).kit.originalInput.jd, body.jd);
+    const ownedKitBody = await ownedKit.json();
+    assert.equal(ownedKitBody.kit.originalInput.jd, body.jd);
     const hiddenKit = await fetch(`${origin}/api/v1/kits/${queuedBody.job.kitId}`, { headers: { Cookie: ownerB.cookie } });
     assert.equal(hiddenKit.status, 404);
+
+    const editedContent = structuredClone(ownedKitBody.kit.content);
+    editedContent.company_brief.summary = "A user-edited summary.";
+    editedContent.role.requirements = [{ id: "manual-r1", text: "Explain TypeScript trade-offs", kind: "technical", priority: "must" }];
+    editedContent.questions = [{
+      id: "manual-q1",
+      requirement_ids: ["manual-r1"],
+      category: "technical",
+      prompt: "How would you design the type boundary?",
+      answer_outline: "Explain validation and inference.",
+      difficulty: 2,
+    }];
+    editedContent.schedule.days = Array.from({ length: 5 }, (_, index) => ({
+      day: index + 1,
+      focus: index === 0 ? "Type boundaries" : "Review",
+      question_ids: ["manual-q1"],
+      minutes: 20,
+    }));
+    const saved = await fetch(`${origin}/api/v1/kits/${queuedBody.job.kitId}`, {
+      method: "PATCH",
+      headers: {
+        Cookie: ownerA.cookie,
+        Origin: browserOrigin,
+        "Content-Type": "application/json",
+        "X-CSRF-Token": ownerA.body.csrfToken,
+      },
+      body: JSON.stringify({ revision: 1, content: editedContent }),
+    });
+    assert.equal(saved.status, 200);
+    const savedBody = await saved.json();
+    assert.equal(savedBody.kit.revision, 2);
+    assert.equal(savedBody.kit.content.company_brief.summary, "A user-edited summary.");
+    assert.deepEqual(savedBody.kit.content.coverage.uncovered_requirement_ids, []);
+
+    const staleSave = await fetch(`${origin}/api/v1/kits/${queuedBody.job.kitId}`, {
+      method: "PATCH",
+      headers: {
+        Cookie: ownerA.cookie,
+        Origin: browserOrigin,
+        "Content-Type": "application/json",
+        "X-CSRF-Token": ownerA.body.csrfToken,
+      },
+      body: JSON.stringify({ revision: 1, content: editedContent }),
+    });
+    assert.equal(staleSave.status, 409);
+    assert.equal((await staleSave.json()).error.code, "KIT_REVISION_CONFLICT");
+
+    const invalidContent = structuredClone(savedBody.kit.content);
+    invalidContent.questions[0].requirement_ids = ["missing-requirement"];
+    const invalidSave = await fetch(`${origin}/api/v1/kits/${queuedBody.job.kitId}`, {
+      method: "PATCH",
+      headers: {
+        Cookie: ownerA.cookie,
+        Origin: browserOrigin,
+        "Content-Type": "application/json",
+        "X-CSRF-Token": ownerA.body.csrfToken,
+      },
+      body: JSON.stringify({ revision: 2, content: invalidContent }),
+    });
+    assert.equal(invalidSave.status, 400);
+    assert.equal((await invalidSave.json()).error.code, "INVALID_KIT_EDIT");
+
+    const crossOwnerSave = await fetch(`${origin}/api/v1/kits/${queuedBody.job.kitId}`, {
+      method: "PATCH",
+      headers: {
+        Cookie: ownerB.cookie,
+        Origin: browserOrigin,
+        "Content-Type": "application/json",
+        "X-CSRF-Token": ownerB.body.csrfToken,
+      },
+      body: JSON.stringify({ revision: 2, content: editedContent }),
+    });
+    assert.equal(crossOwnerSave.status, 404);
 
     const activeRetry = await fetch(`${origin}/api/v1/jobs/${queuedBody.job.id}/retry`, {
       method: "POST",

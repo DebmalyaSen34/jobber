@@ -25,8 +25,8 @@ body {
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
-button, a, input, textarea { -webkit-tap-highlight-color: transparent; }
-a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
+button, a, input, textarea, select { -webkit-tap-highlight-color: transparent; }
+a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible, summary:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
 
 .site-shell {
   width: min(1180px, calc(100% - 40px));
@@ -423,6 +423,48 @@ code { padding: 0.12em 0.35em; border-radius: 5px; color: var(--ink); background
 .source-list { display: grid; gap: 8px; margin: 0; padding-left: 20px; }
 .source-list a { color: var(--ink); overflow-wrap: anywhere; text-underline-offset: 3px; }
 
+.editor-toolbar { position: sticky; z-index: 3; top: 63px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px 24px; align-items: center; margin-top: 12px; padding: 14px 16px; border: 1px solid #bcc7b6; border-radius: 14px; background: rgba(255, 254, 249, 0.97); box-shadow: 0 12px 34px rgba(31, 52, 46, 0.1); backdrop-filter: blur(14px); }
+.editor-toolbar strong, .editor-toolbar span { display: block; }
+.editor-toolbar strong { font-size: 0.85rem; }
+.save-message { margin-top: 3px; color: var(--ink-soft); font-size: 0.75rem; line-height: 1.4; }
+.save-message--saved { color: var(--accent-dark); font-weight: 750; }
+.save-message--error, .save-message--conflict { color: var(--danger); font-weight: 750; }
+.editor-toolbar__actions, .item-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.editor-toolbar__actions .primary-button, .editor-toolbar__actions .secondary-button { min-height: 44px; padding: 0 16px; }
+.editor-reload { grid-column: 1 / -1; justify-self: start; padding: 0; border: 0; background: transparent; cursor: pointer; }
+.editor-stack, .editor-collection { display: grid; gap: 16px; }
+.editor-inline-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.editor-field { min-width: 0; display: grid; gap: 7px; color: var(--ink); font-size: 0.76rem; font-weight: 800; }
+.editor-field input, .editor-field textarea, .editor-field select { width: 100%; min-height: 44px; padding: 10px 12px; border: 1px solid #9eaba1; border-radius: 9px; color: var(--ink); background: white; font: inherit; font-weight: 500; line-height: 1.45; }
+.editor-field textarea { resize: vertical; }
+.editor-field input:hover, .editor-field textarea:hover, .editor-field select:hover { border-color: #61736a; }
+.editor-field--compact { max-width: 340px; }
+.editor-field--title { max-width: 850px; margin: 16px 0 18px; }
+.editor-field--title input { min-height: 72px; padding: 8px 12px; font-family: Georgia, "Times New Roman", serif; font-size: clamp(2.1rem, 5vw, 4rem); letter-spacing: -0.045em; }
+.editor-field--minutes { width: 90px; }
+.editor-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin: 24px 0 14px; }
+.editor-heading--top { margin: 0 0 24px; padding: 16px; border: 1px solid var(--line); border-radius: 12px; background: rgba(255, 254, 249, 0.72); }
+.editor-heading h3, .editor-heading p { margin: 0; }
+.editor-heading p { color: var(--ink-soft); font-size: 0.82rem; line-height: 1.5; }
+.editor-list-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: start; }
+.small-button, .danger-button { min-height: 44px; padding: 0 13px; border-radius: 9px; font: inherit; font-size: 0.76rem; font-weight: 800; cursor: pointer; }
+.small-button { border: 1px solid #829087; color: var(--ink); background: var(--paper-strong); }
+.small-button:hover { background: #eef0e8; }
+.small-button:disabled { cursor: not-allowed; opacity: 0.42; }
+.danger-button { border: 1px solid #d7a69e; color: #812f25; background: #fff8f6; }
+.danger-button:hover { background: #fff0ec; }
+.requirement-card--editing, .question-card--editing, .flashcard--editing, .schedule-day--editing { border-color: #b9c6b4; background: rgba(255, 254, 249, 0.92); }
+.requirement-card--editing { display: grid; gap: 14px; }
+.question-card--editing { margin-top: 10px; padding: 20px; border: 1px solid #b9c6b4; border-radius: 14px; }
+.flashcard--editing { min-height: 0; }
+.reference-checks { min-width: 0; display: grid; gap: 7px; max-height: 220px; margin: 0; padding: 12px; border: 1px solid var(--line); border-radius: 10px; overflow-y: auto; }
+.reference-checks legend { padding: 0 5px; font-size: 0.75rem; font-weight: 850; }
+.reference-checks label { min-height: 34px; display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 8px; align-items: start; color: var(--ink-soft); font-size: 0.77rem; line-height: 1.4; cursor: pointer; }
+.reference-checks input { width: 18px; height: 18px; margin: 1px 0 0; accent-color: var(--accent-dark); }
+.reference-checks p { margin: 0; color: var(--ink-soft); font-size: 0.78rem; }
+.schedule-day--editing { align-items: start !important; margin: 10px 0; padding: 18px !important; border: 1px solid #b9c6b4 !important; border-radius: 14px; }
+.editor-note { margin: 0 0 22px; padding: 12px 14px; border-left: 3px solid var(--accent-dark); color: var(--ink-soft); background: #f1f6e9; font-size: 0.82rem; line-height: 1.5; }
+
 @media (prefers-reduced-motion: reduce) {
   .live-label span { animation: none; }
   .kit-card { transition: none; }
@@ -459,6 +501,15 @@ code { padding: 0.12em 0.35em; border-radius: 5px; color: var(--ink); background
   .question-card { grid-template-columns: 30px minmax(0, 1fr); gap: 10px; }
   .schedule-list li { grid-template-columns: 54px minmax(0, 1fr); gap: 14px; }
   .schedule-list .minutes { grid-column: 2; }
+  .editor-toolbar { top: 8px; grid-template-columns: 1fr; }
+  .editor-toolbar__actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .editor-toolbar__actions .primary-button, .editor-toolbar__actions .secondary-button { width: 100%; }
+  .editor-inline-grid { grid-template-columns: 1fr; }
+  .editor-heading { align-items: stretch; flex-direction: column; }
+  .editor-list-row { grid-template-columns: 1fr; }
+  .question-card--editing { grid-template-columns: 1fr; }
+  .schedule-day--editing { grid-template-columns: 48px minmax(0, 1fr); }
+  .schedule-day--editing .editor-field--minutes { grid-column: 2; width: 100%; }
 }
 
 @media (max-width: 460px) {

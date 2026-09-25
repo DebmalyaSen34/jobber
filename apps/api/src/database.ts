@@ -402,6 +402,26 @@ export class MongoPersistence implements Persistence {
     return record ? toOwnedKit(record) : null;
   }
 
+  async updateOwnedKit(input: {
+    ownerId: string;
+    kitId: string;
+    expectedRevision: number;
+    content: Kit;
+    now: Date;
+  }): Promise<{ kind: "updated"; kit: OwnedKit } | { kind: "not_found" } | { kind: "conflict"; revision: number }> {
+    if (!ObjectId.isValid(input.ownerId) || !ObjectId.isValid(input.kitId)) return { kind: "not_found" };
+    const id = new ObjectId(input.kitId);
+    const ownerId = new ObjectId(input.ownerId);
+    const record = await this.kits.findOneAndUpdate(
+      { _id: id, owner_id: ownerId, revision: input.expectedRevision },
+      { $set: { content: input.content, updated_at: input.now }, $inc: { revision: 1 } },
+      { returnDocument: "after" },
+    );
+    if (record) return { kind: "updated", kit: toOwnedKit(record) };
+    const current = await this.kits.findOne({ _id: id, owner_id: ownerId }, { projection: { revision: 1 } });
+    return current ? { kind: "conflict", revision: current.revision } : { kind: "not_found" };
+  }
+
   async claimNextJob(workerId: string, now: Date, leaseMs: number): Promise<ClaimedJob | null> {
     await this.jobs.updateMany(
       {
