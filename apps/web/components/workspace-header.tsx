@@ -1,9 +1,9 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { Session } from "@/lib/api-types";
+import { BackLink } from "./back-link";
 import { Brand } from "./brand";
 import { InlineSpinner } from "./loading-state";
 
@@ -33,9 +33,9 @@ export function WorkspaceHeader({ session, backHref }: { session?: Session | nul
 
   return (
     <header className="site-header workspace-header">
-      <Brand />
+      <Brand href="/dashboard" label="Jobber dashboard" />
       <nav className="header-actions" aria-label="Workspace navigation">
-        {backHref && <Link className="text-link" href={backHref}>Dashboard</Link>}
+        {backHref && <BackLink href={backHref} destination="dashboard" />}
         {session && <span className="account-email">{session.email}</span>}
         {session && (
           <button className="header-button button-with-spinner" type="button" onClick={() => void logout()} disabled={loggingOut}>

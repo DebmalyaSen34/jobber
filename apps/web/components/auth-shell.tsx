@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { BackLink } from "./back-link";
 import { Brand } from "./brand";
 
 export function AuthShell({ eyebrow, title, description, children }: {
@@ -9,7 +10,10 @@ export function AuthShell({ eyebrow, title, description, children }: {
 }) {
   return (
     <div className="auth-shell">
-      <header className="auth-header"><Brand /></header>
+      <header className="auth-header">
+        <Brand />
+        <BackLink href="/" destination="home" />
+      </header>
       <main className="auth-main">
         <section className="auth-intro">
           <p className="eyebrow">{eyebrow}</p>

@@ -64,6 +64,11 @@ a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visib
 .build-label, .site-footer { color: var(--ink-soft); font-size: 0.78rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
 .header-actions, .hero-actions { display: flex; align-items: center; gap: 20px; }
 .text-link { min-height: 44px; display: inline-flex; align-items: center; color: var(--ink); font-weight: 750; text-underline-offset: 4px; }
+.back-link { min-height: 44px; display: inline-flex; align-items: center; gap: 7px; color: var(--ink); font-size: 0.84rem; font-weight: 800; text-decoration: none; }
+.back-link__icon { width: 18px; height: 18px; display: inline-flex; flex: 0 0 auto; transition: transform 160ms ease; }
+.back-link__label { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 4px; }
+.back-link:hover .back-link__icon { transform: translateX(-2px); }
+.back-link:active { opacity: 0.72; }
 .compact-button, .primary-link { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; border-radius: 12px; color: var(--paper-strong); background: var(--ink); font-weight: 750; text-decoration: none; }
 .compact-button { padding: 0 17px; font-size: 0.88rem; }
 .primary-link { min-height: 52px; padding: 0 22px; }
@@ -154,7 +159,7 @@ code { padding: 0.12em 0.35em; border-radius: 5px; color: var(--ink); background
 
 .auth-shell, .dashboard-shell { width: min(1180px, calc(100% - 40px)); min-height: 100vh; margin: 0 auto; }
 .auth-shell { display: grid; grid-template-rows: auto 1fr auto; }
-.auth-header { min-height: 76px; display: flex; align-items: center; border-bottom: 1px solid var(--line); }
+.auth-header { min-height: 76px; display: flex; align-items: center; justify-content: space-between; gap: 20px; border-bottom: 1px solid var(--line); }
 .auth-main { display: grid; grid-template-columns: minmax(0, 1fr) minmax(360px, 480px); gap: clamp(48px, 9vw, 132px); align-items: center; padding: clamp(64px, 10vh, 110px) 0; }
 .auth-intro h1, .empty-workspace h1 { margin: 20px 0 24px; font-size: clamp(3.3rem, 7vw, 6.6rem); }
 .auth-intro > p:last-child, .empty-workspace > p:last-child { max-width: 610px; margin: 0; color: var(--ink-soft); font-size: 1.08rem; line-height: 1.65; }
@@ -234,6 +239,7 @@ code { padding: 0.12em 0.35em; border-radius: 5px; color: var(--ink); background
   html { scroll-behavior: auto; }
   .status-pill--loading .status-pill__dot { animation: none; }
   .inline-spinner, .loading-track span, .skeleton-card::after, .transition-signal--confirmed { animation: none; }
+  .back-link__icon { transition: none; }
 }
 
 @media (max-width: 820px) {
@@ -250,6 +256,7 @@ code { padding: 0.12em 0.35em; border-radius: 5px; color: var(--ink); background
   .build-label { max-width: 130px; text-align: right; }
   .header-actions .text-link { display: none; }
   .header-actions { gap: 10px; }
+  .back-link__prefix { display: none; }
   .hero-actions { align-items: stretch; flex-direction: column; }
   .hero-actions .text-link { justify-content: center; }
   .status-card__topline, .status-card__footer, .site-footer { align-items: flex-start; flex-direction: column; }

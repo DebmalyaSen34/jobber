@@ -9,9 +9,9 @@ function Mark() {
   );
 }
 
-export function Brand() {
+export function Brand({ href = "/", label = "Jobber home" }: { href?: string; label?: string }) {
   return (
-    <Link className="brand" href="/" aria-label="Jobber home">
+    <Link className="brand" href={href} aria-label={label}>
       <Mark />
       <span>Jobber</span>
     </Link>
