@@ -20,6 +20,11 @@ const environmentSchema = z
     LOGIN_WINDOW_MINUTES: positiveInteger.max(60).default(15),
     LOGIN_EMAIL_LIMIT: positiveInteger.max(100).default(5),
     LOGIN_IP_LIMIT: positiveInteger.max(500).default(20),
+    JOB_LEASE_SECONDS: positiveInteger.max(600).default(60),
+    JOB_POLL_MS: positiveInteger.max(60_000).default(1_000),
+    JOB_MAX_ATTEMPTS: positiveInteger.max(10).default(3),
+    JOB_RETRY_BASE_MS: positiveInteger.max(300_000).default(5_000),
+    PIPELINE_VERSION: z.string().trim().min(1).max(64).default("1"),
   })
   .superRefine((value, context) => {
     if (!value.SESSION_SECRET) {
@@ -63,6 +68,11 @@ export type AppConfig = {
   loginWindowMs: number;
   loginEmailLimit: number;
   loginIpLimit: number;
+  jobLeaseMs: number;
+  jobPollMs: number;
+  jobMaxAttempts: number;
+  jobRetryBaseMs: number;
+  pipelineVersion: string;
 };
 
 function parseOrigins(raw: string): string[] {
@@ -114,5 +124,10 @@ export function loadConfig(input: NodeJS.ProcessEnv = process.env): AppConfig {
     loginWindowMs: parsed.data.LOGIN_WINDOW_MINUTES * 60 * 1_000,
     loginEmailLimit: parsed.data.LOGIN_EMAIL_LIMIT,
     loginIpLimit: parsed.data.LOGIN_IP_LIMIT,
+    jobLeaseMs: parsed.data.JOB_LEASE_SECONDS * 1_000,
+    jobPollMs: parsed.data.JOB_POLL_MS,
+    jobMaxAttempts: parsed.data.JOB_MAX_ATTEMPTS,
+    jobRetryBaseMs: parsed.data.JOB_RETRY_BASE_MS,
+    pipelineVersion: parsed.data.PIPELINE_VERSION,
   };
 }

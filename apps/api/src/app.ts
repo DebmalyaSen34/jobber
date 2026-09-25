@@ -3,6 +3,7 @@ import express, { type NextFunction, type Request, type Response } from "express
 import { AuthError, AuthService, assertOwner, publicUser, type SessionWithUser } from "./auth.js";
 import type { AppConfig } from "./config.js";
 import type { Persistence } from "./database.js";
+import { JobError, JobService, publicJob } from "./jobs.js";
 
 const DEVELOPMENT_SESSION_COOKIE = "jobber_session";
 const PRODUCTION_SESSION_COOKIE = "__Host-jobber_session";
@@ -54,7 +55,11 @@ function authPayload(session: SessionWithUser) {
   };
 }
 
-export function createApp(config: AppConfig, persistence: Persistence) {
+export function createApp(
+  config: AppConfig,
+  persistence: Persistence,
+  dependencies: { notifyJobAvailable?: () => void } = {},
+) {
   const app = express();
   const auth = new AuthService(persistence, {
     secret: config.sessionSecret,
@@ -72,6 +77,10 @@ export function createApp(config: AppConfig, persistence: Persistence) {
     path: "/",
   };
   const issuedCookieOptions = { ...cookieOptions, maxAge: config.sessionTtlMs };
+  const jobs = new JobService(persistence, {
+    pipelineVersion: config.pipelineVersion,
+    maxAttempts: config.jobMaxAttempts,
+  });
 
   const requireMutationOrigin = (request: Request): void => {
     const origin = request.header("origin");
@@ -119,7 +128,7 @@ export function createApp(config: AppConfig, persistence: Persistence) {
     next();
   });
   app.use(express.json({ limit: "1mb" }));
-  app.use(["/api/v1/auth", "/api/v1/account"], (_request, response, next) => {
+  app.use(["/api/v1/auth", "/api/v1/account", "/api/v1/jobs", "/api/v1/kits"], (_request, response, next) => {
     response.setHeader("Cache-Control", "no-store");
     next();
   });
@@ -199,6 +208,31 @@ export function createApp(config: AppConfig, persistence: Persistence) {
     response.json({ user: publicUser(session.user) });
   });
 
+  app.post("/api/v1/kits", async (request, response) => {
+    requireMutationOrigin(request);
+    const session = await resolveAuthenticatedSession(request, response);
+    auth.verifyCsrf(session, request.header("x-csrf-token"));
+    const queued = await jobs.enqueue(session.user.id, request.body);
+    dependencies.notifyJobAvailable?.();
+    response.setHeader("Location", `/api/v1/jobs/${queued.job.id}`);
+    response.status(202).json({ job: publicJob(queued.job), deduplicated: queued.deduplicated });
+  });
+
+  app.get("/api/v1/jobs/:jobId", async (request, response) => {
+    const session = await resolveAuthenticatedSession(request, response);
+    const job = await jobs.getOwned(session.user.id, request.params.jobId);
+    response.json({ job: publicJob(job) });
+  });
+
+  app.post("/api/v1/jobs/:jobId/retry", async (request, response) => {
+    requireMutationOrigin(request);
+    const session = await resolveAuthenticatedSession(request, response);
+    auth.verifyCsrf(session, request.header("x-csrf-token"));
+    const job = await jobs.retry(session.user.id, request.params.jobId);
+    dependencies.notifyJobAvailable?.();
+    response.status(202).json({ job: publicJob(job) });
+  });
+
   app.use((_request, response) => {
     response.status(404).json({ error: { code: "NOT_FOUND", message: "Route not found." } });
   });
@@ -215,6 +249,18 @@ export function createApp(config: AppConfig, persistence: Persistence) {
           code: error.code,
           message: error.message,
           ...(error.options.fieldErrors ? { fields: error.options.fieldErrors } : {}),
+        },
+      });
+      return;
+    }
+    if (error instanceof JobError) {
+      response.status(error.status).json({
+        error: {
+          code: error.code,
+          message: error.message,
+          ...(error.options.retryable !== undefined ? { retryable: error.options.retryable } : {}),
+          ...(error.options.fields ? { fields: error.options.fields } : {}),
+          ...(error.options.existingJobId ? { details: { existingJobId: error.options.existingJobId } } : {}),
         },
       });
       return;

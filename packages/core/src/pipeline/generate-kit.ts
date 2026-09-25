@@ -32,7 +32,10 @@ export class GenerationError extends Error {
   }
 }
 
-export type KitGenerator = (input: EvaluationCase) => Promise<Kit>;
+export type KitGenerator = (
+  input: EvaluationCase,
+  onProgress?: (progress: PipelineProgress) => void | Promise<void>,
+) => Promise<Kit>;
 
 export type PipelineStage =
   | "researching"
@@ -322,10 +325,10 @@ export async function generateKitWithDependencies(
 }
 
 /** Production entry point: public-only retrieval and environment-configured provider. */
-export const generateKit: KitGenerator = async (input) => {
+export const generateKit: KitGenerator = async (input, onProgress) => {
   try {
     const env = process.env;
-    return await generateKitWithDependencies(input, configuredDependencies(env), optionsFromEnv(env));
+    return await generateKitWithDependencies(input, configuredDependencies(env), optionsFromEnv(env), onProgress);
   } catch (error) {
     throw safeGenerationError(error);
   }

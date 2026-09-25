@@ -7,7 +7,9 @@ import { loadConfig } from "../../dist/config.js";
 class MemoryPersistence {
   users = new Map();
   sessions = new Map();
+  jobs = new Map();
   nextUserId = 1;
+  nextJobId = 1;
 
   async connect() {}
   async ping() {}
@@ -45,6 +47,55 @@ class MemoryPersistence {
   }
 
   async clearLoginLimits() {}
+
+  async enqueueJob(input) {
+    const active = [...this.jobs.values()].find((job) =>
+      job.ownerId === input.ownerId && job.fingerprint === input.fingerprint &&
+      ["queued", "running", "retry_wait"].includes(job.status));
+    if (active) return { job: active, deduplicated: true };
+    const job = {
+      id: `job-${this.nextJobId++}`,
+      ownerId: input.ownerId,
+      kitId: `kit-${this.nextJobId}`,
+      fingerprint: input.fingerprint,
+      pipelineVersion: input.pipelineVersion,
+      input: input.jobInput,
+      status: "queued",
+      stage: "queued",
+      progress: [],
+      warnings: [],
+      attempt: 0,
+      maxAttempts: input.maxAttempts,
+      createdAt: input.now,
+      updatedAt: input.now,
+    };
+    this.jobs.set(job.id, job);
+    return { job, deduplicated: false };
+  }
+
+  async findOwnedJob(ownerId, jobId) {
+    const job = this.jobs.get(jobId);
+    return job?.ownerId === ownerId ? job : null;
+  }
+
+  async retryOwnedJob(ownerId, jobId, now) {
+    const job = await this.findOwnedJob(ownerId, jobId);
+    if (!job || job.status !== "failed") return null;
+    job.status = "queued";
+    job.stage = "queued";
+    job.attempt = 0;
+    job.updatedAt = now;
+    delete job.error;
+    return job;
+  }
+
+  async claimNextJob() { return null; }
+  async renewJobLease() { return false; }
+  async checkpointJob() { return false; }
+  async completeJob() { return false; }
+  async recordJobFailure() { return false; }
+  async releaseJob() { return false; }
+  async materializeCompletedKits() {}
 }
 
 async function listen(app) {
@@ -172,6 +223,116 @@ test("HTTP auth flow enforces origin, session, CSRF, and logout invalidation", a
     const invalidated = await fetch(`${origin}/api/v1/account`, { headers: { Cookie: cookie } });
     assert.equal(invalidated.status, 401);
     assert.equal((await invalidated.json()).error.code, "UNAUTHENTICATED");
+  } finally {
+    await close(server);
+  }
+});
+
+test("HTTP job flow enforces CSRF, active deduplication, validation, and ownership", async () => {
+  const config = loadConfig({
+    NODE_ENV: "test",
+    MONGODB_URI: "mongodb://127.0.0.1:27017",
+    WEB_ORIGINS: "http://localhost:3000",
+    SESSION_SECRET: "test-session-secret-with-at-least-32-characters",
+    BCRYPT_ROUNDS: "4",
+  });
+  const persistence = new MemoryPersistence();
+  let wakeCount = 0;
+  const { server, origin } = await listen(createApp(config, persistence, { notifyJobAvailable: () => wakeCount++ }));
+  const browserOrigin = "http://localhost:3000";
+
+  async function register(email) {
+    const response = await fetch(`${origin}/api/v1/auth/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Origin: browserOrigin },
+      body: JSON.stringify({ email, password: "correct horse battery staple" }),
+    });
+    assert.equal(response.status, 201);
+    return {
+      cookie: response.headers.get("set-cookie").split(";", 1)[0],
+      body: await response.json(),
+    };
+  }
+
+  try {
+    const ownerA = await register("owner-a@example.com");
+    const ownerB = await register("owner-b@example.com");
+    const body = {
+      jd: "Build reliable TypeScript APIs.",
+      company_url: "https://example.com/careers",
+      days: 5,
+    };
+
+    const noCsrf = await fetch(`${origin}/api/v1/kits`, {
+      method: "POST",
+      headers: { Cookie: ownerA.cookie, Origin: browserOrigin, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    assert.equal(noCsrf.status, 403);
+    assert.equal((await noCsrf.json()).error.code, "INVALID_CSRF");
+
+    const queued = await fetch(`${origin}/api/v1/kits`, {
+      method: "POST",
+      headers: {
+        Cookie: ownerA.cookie,
+        Origin: browserOrigin,
+        "Content-Type": "application/json",
+        "X-CSRF-Token": ownerA.body.csrfToken,
+      },
+      body: JSON.stringify(body),
+    });
+    assert.equal(queued.status, 202);
+    assert.match(queued.headers.get("location"), /^\/api\/v1\/jobs\/job-/);
+    const queuedBody = await queued.json();
+    assert.equal(queuedBody.deduplicated, false);
+    assert.equal(queuedBody.job.status, "queued");
+    assert.equal("input" in queuedBody.job, false);
+
+    const duplicate = await fetch(`${origin}/api/v1/kits`, {
+      method: "POST",
+      headers: {
+        Cookie: ownerA.cookie,
+        Origin: browserOrigin,
+        "Content-Type": "application/json",
+        "X-CSRF-Token": ownerA.body.csrfToken,
+      },
+      body: JSON.stringify(body),
+    });
+    const duplicateBody = await duplicate.json();
+    assert.equal(duplicate.status, 202);
+    assert.equal(duplicateBody.deduplicated, true);
+    assert.equal(duplicateBody.job.id, queuedBody.job.id);
+    assert.equal(wakeCount, 2);
+
+    const owned = await fetch(`${origin}/api/v1/jobs/${queuedBody.job.id}`, { headers: { Cookie: ownerA.cookie } });
+    assert.equal(owned.status, 200);
+    assert.equal((await owned.json()).job.id, queuedBody.job.id);
+
+    const hidden = await fetch(`${origin}/api/v1/jobs/${queuedBody.job.id}`, { headers: { Cookie: ownerB.cookie } });
+    assert.equal(hidden.status, 404);
+    assert.equal((await hidden.json()).error.code, "NOT_FOUND");
+
+    const activeRetry = await fetch(`${origin}/api/v1/jobs/${queuedBody.job.id}/retry`, {
+      method: "POST",
+      headers: { Cookie: ownerA.cookie, Origin: browserOrigin, "X-CSRF-Token": ownerA.body.csrfToken },
+    });
+    assert.equal(activeRetry.status, 409);
+    const activeRetryBody = await activeRetry.json();
+    assert.equal(activeRetryBody.error.code, "JOB_NOT_RETRYABLE");
+    assert.equal(activeRetryBody.error.details.existingJobId, queuedBody.job.id);
+
+    const invalid = await fetch(`${origin}/api/v1/kits`, {
+      method: "POST",
+      headers: {
+        Cookie: ownerA.cookie,
+        Origin: browserOrigin,
+        "Content-Type": "application/json",
+        "X-CSRF-Token": ownerA.body.csrfToken,
+      },
+      body: JSON.stringify({ ...body, days: 61 }),
+    });
+    assert.equal(invalid.status, 400);
+    assert.equal((await invalid.json()).error.fields.days, "Days must be at most 60.");
   } finally {
     await close(server);
   }

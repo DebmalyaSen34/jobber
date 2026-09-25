@@ -1,6 +1,6 @@
 # Jobber — AI Interview Prep Kit
 
-Implementation follows the assessment PRD in the parent workspace (`../PRD.md`). **M1, M2, and M3 task 1 are complete; M3 task 2 is implemented locally and awaits production verification**. The frontend is deployed on Vercel, the MongoDB-backed Express API is deployed on Render, and the production browser-to-API-to-Atlas readiness path is verified. The current code adds persisted authentication, CSRF protection, login throttling, an authenticated workspace, and a reusable ownership guard.
+Implementation follows the assessment PRD in the parent workspace (`../PRD.md`). **M1, M2, and M3 tasks 1–2 are complete; M3 task 3 is implemented locally and awaits production recovery verification**. The frontend is deployed on Vercel, the MongoDB-backed Express API is deployed on Render, and the production browser-to-API-to-Atlas readiness path is verified. The current code includes persisted authentication plus owner-scoped asynchronous generation jobs with progress, deduplication, retries, leases, and stale-worker fencing.
 
 ## Setup
 
@@ -69,7 +69,7 @@ scripts/          TypeScript CLI and integration tests
 examples/         Sample batch input (not a live benchmark)
 ```
 
-The application now includes registration, login, logout, persisted HttpOnly sessions, and an authenticated dashboard. Browser API requests remain same-origin through a Vercel-to-Render rewrite. Owned kits, background jobs, and the creation workspace are subsequent M3 tasks. See [docs/authentication.md](docs/authentication.md) and [docs/deployment.md](docs/deployment.md).
+The application includes registration, login, logout, persisted HttpOnly sessions, and an authenticated dashboard. Browser API requests remain same-origin through a Vercel-to-Render rewrite. The API now accepts owned kit-generation submissions and exposes durable polling/retry state; the dashboard creation and readable kit workspace are the next M3 task. See [docs/authentication.md](docs/authentication.md), [docs/jobs.md](docs/jobs.md), and [docs/deployment.md](docs/deployment.md).
 
 Import shared contracts from `@jobber/core`. The package exports compiled ESM and TypeScript declarations; root development/build/check commands build it first. After changing core while the frontend is already running, run `npm run build --workspace=@jobber/core` to refresh its compiled output.
 

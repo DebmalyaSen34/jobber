@@ -34,6 +34,16 @@ services:
         value: 5
       - key: LOGIN_IP_LIMIT
         value: 20
+      - key: JOB_LEASE_SECONDS
+        value: 60
+      - key: JOB_POLL_MS
+        value: 1000
+      - key: JOB_MAX_ATTEMPTS
+        value: 3
+      - key: JOB_RETRY_BASE_MS
+        value: 5000
+      - key: PIPELINE_VERSION
+        value: "1"
       - key: WEB_ORIGINS
         sync: false
       - key: MONGODB_CONNECT_TIMEOUT_MS

@@ -22,6 +22,9 @@ Current platform references: [Render free services](https://render.com/docs/free
 | `SESSION_SECRET` | Render secret | At least 32 characters; HMAC key for privacy-preserving login-limit identifiers |
 | `SESSION_TTL_HOURS`, `BCRYPT_ROUNDS` | Render | Session lifetime and password hashing work factor |
 | `LOGIN_WINDOW_MINUTES`, `LOGIN_EMAIL_LIMIT`, `LOGIN_IP_LIMIT` | Render | Persisted login throttling policy |
+| `JOB_LEASE_SECONDS`, `JOB_POLL_MS` | Render | MongoDB worker lease and idle polling intervals |
+| `JOB_MAX_ATTEMPTS`, `JOB_RETRY_BASE_MS` | Render | Automatic job retry policy |
+| `PIPELINE_VERSION` | Render | Input-deduplication boundary for generation semantics |
 | `WEB_ORIGINS` | Render | Comma-separated exact Vercel/local web origins; no wildcard |
 | `API_PROXY_TARGET` | Vercel server env | Preferred Render API origin used by the same-origin rewrite |
 | `NEXT_PUBLIC_API_BASE_URL` | Vercel public env | Render API origin, without a trailing slash |
@@ -77,3 +80,5 @@ This completes the M3 task 1 early deployed slice and production secret/persiste
 - Run `npm ci`, `npm run check`, and the evaluation CLI from a clean clone with only documented credentials.
 
 M3 task 2 now implements cookies, CSRF, persisted sessions, login throttling, and an authenticated workspace. See [authentication.md](authentication.md). Production auth verification and job continuation/recovery remain outstanding until the updated services and persisted-job task are deployed.
+
+M3 task 3 now adds the MongoDB-backed execution loop described in [jobs.md](jobs.md). It intentionally runs inside the Render web process initially, so no Redis or separate worker service is required. On shutdown, the process stops claiming jobs and releases its current lease before closing MongoDB. Production acceptance still requires a real submit/refresh/restart recovery exercise after deployment.

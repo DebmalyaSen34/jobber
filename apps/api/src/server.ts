@@ -1,7 +1,9 @@
 import { createServer } from "node:http";
+import { generateKit } from "@jobber/core";
 import { createApp } from "./app.js";
 import { loadConfig } from "./config.js";
 import { MongoPersistence } from "./database.js";
+import { createWorkerId, JobRunner } from "./jobs.js";
 
 async function main(): Promise<void> {
   const config = loadConfig();
@@ -13,9 +15,17 @@ async function main(): Promise<void> {
   );
 
   await persistence.connect();
-  const server = createServer(createApp(config, persistence));
+  await persistence.materializeCompletedKits();
+  const runner = new JobRunner(persistence, generateKit, {
+    workerId: createWorkerId(config.release),
+    leaseMs: config.jobLeaseMs,
+    pollMs: config.jobPollMs,
+    retryBaseMs: config.jobRetryBaseMs,
+  });
+  const server = createServer(createApp(config, persistence, { notifyJobAvailable: () => runner.wake() }));
   server.listen(config.port, "0.0.0.0", () => {
     console.info(`jobber-api listening on port ${config.port} (${config.release})`);
+    runner.start();
   });
 
   let shuttingDown = false;
@@ -23,6 +33,7 @@ async function main(): Promise<void> {
     if (shuttingDown) return;
     shuttingDown = true;
     console.info(`jobber-api received ${signal}; shutting down`);
+    await runner.stop();
 
     const timeout = setTimeout(() => {
       console.error("jobber-api shutdown grace period expired");
