@@ -55,7 +55,7 @@ Anecdotes may be outdated or wrong and are never official company policy. Treat 
 
 `RetrievalClient.fetchJson` adds an explicit `application/json` path to the existing safe transport. It retains DNS/IP validation, pinned connections, normal TLS checks, robots, pacing, retries, redirect validation, encoded/decoded byte limits, and structured failures. `fetchPage` still rejects JSON. Invalid JSON reports `INVALID_JSON`.
 
-Search defaults are 20 seconds overall, 8 seconds per operation, 10 total HTTP attempts (including robots/retries), one retry, and the existing 1 MiB encoded/decoded response limit. Provider redirects are restricted to the configured origin and API/robots paths. Caller source restrictions are combined with that restriction. Options, endpoint overrides, resolver/transport injection, and local fixture policies are trusted process/test configuration; never expose them as request parameters. Pacing remains per client; future concurrent jobs need shared coordination. These budgets must later fit the pipeline's total deadline.
+Search defaults are 30 seconds overall at the pipeline boundary, eight seconds per operation, 10 total HTTP attempts (including robots/retries), one retry, and the existing 1 MiB encoded/decoded response limit. Provider redirects are restricted to the configured origin and API/robots paths. Caller source restrictions are combined with that restriction. Options, endpoint overrides, resolver/transport injection, and local fixture policies are trusted process/test configuration; never expose them as request parameters. Pacing remains per client; future concurrent jobs need shared coordination. These limits must fit the pipeline's total deadline.
 
 ## Verification and live acceptance
 

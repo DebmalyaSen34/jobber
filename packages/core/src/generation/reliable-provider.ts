@@ -131,8 +131,8 @@ export class ReliableJsonProvider implements JsonProvider {
   readonly #calls: ProviderCallTrace[] = [];
 
   constructor(private readonly provider: JsonProvider, private readonly options: ReliableProviderOptions) {
-    this.#maxRequests = positive(options.maxRequests ?? 20, "Provider request budget");
-    this.#maxTokens = positive(options.maxTokens ?? 30_000, "Provider token budget");
+    this.#maxRequests = positive(options.maxRequests ?? 30, "Provider request budget");
+    this.#maxTokens = positive(options.maxTokens ?? 60_000, "Provider token budget");
     this.#retries = positive(options.retries ?? 2, "Provider retry count", true);
     this.#baseDelayMs = positive(options.baseDelayMs ?? 500, "Provider retry delay", true);
     this.#maxRetryDelayMs = positive(options.maxRetryDelayMs ?? 10_000, "Provider maximum retry delay", true);
@@ -173,7 +173,7 @@ export class ReliableJsonProvider implements JsonProvider {
           ?? ((result.usage.inputTokens ?? estimateTokens(currentRequest)) + (result.usage.outputTokens ?? 0));
         this.#tokens += used;
         if (this.#tokens > this.#maxTokens) {
-          throw new ProviderError("PROVIDER_REQUEST_FAILED", "Provider token budget exhausted.", false);
+          throw new ProviderError("PROVIDER_REQUEST_FAILED", "This kit needed more AI processing than the generation limit allows. Please retry it.", false);
         }
         const validation = currentRequest.validate?.(result.value);
         if (validation && !validation.success) {
@@ -213,12 +213,12 @@ export class ReliableJsonProvider implements JsonProvider {
       throw new ProviderError("PROVIDER_TIMEOUT", "Provider case deadline expired.", false);
     }
     if (this.#requests >= this.#maxRequests) {
-      throw new ProviderError("PROVIDER_REQUEST_FAILED", "Provider request budget exhausted.", false);
+      throw new ProviderError("PROVIDER_REQUEST_FAILED", "This kit needed more AI processing than the generation limit allows. Please retry it.", false);
     }
     const estimate = estimateTokens(request);
     const remaining = this.#maxTokens - this.#tokens;
     if (remaining <= estimate + 64) {
-      throw new ProviderError("PROVIDER_REQUEST_FAILED", "Provider token budget exhausted.", false);
+      throw new ProviderError("PROVIDER_REQUEST_FAILED", "This kit needed more AI processing than the generation limit allows. Please retry it.", false);
     }
     request.maxOutputTokens = Math.min(request.maxOutputTokens ?? 4_096, remaining - estimate);
   }

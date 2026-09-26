@@ -49,13 +49,13 @@ This follows the address-validation and redirect concerns described in [OWASP's 
 
 | Bound | Default |
 | --- | ---: |
-| Crawl page attempts | 10 |
+| Crawl page attempts | 15 |
 | Discovered-link depth | 3 |
 | Candidate origins | 4 |
 | Pending candidate links | 100 |
 | Discovered links per page | 200 |
-| Total HTTP attempts, including robots/retries/redirects | 40 |
-| Entire client/research time budget | 45 seconds |
+| Total HTTP attempts, including robots/retries/redirects | 60 |
+| Entire client/research time budget | 60 seconds |
 | Each page operation, including robots/redirects/retries | 10 seconds |
 | Minimum hostname request interval | 250 ms |
 | Retries after initial attempt | 2 |

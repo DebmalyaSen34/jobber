@@ -148,7 +148,7 @@ test("request and time budgets stop work, including never-resolving DNS", async 
   await assert.rejects(() => stuck.fetchPage("https://acme.test/"), { code: "TIMEOUT" });
   const crawl = await crawlCompany("https://acme.test/acme/", { ...noWait, maxPages: 1 }, dependencies);
   assert.equal(crawl.pages.length, 1);
-  assert.ok(crawl.warnings.some((w) => w.code === "CRAWL_LIMIT_REACHED"));
+  assert.ok(crawl.warnings.some((w) => w.code === "CRAWL_LIMIT_REACHED" && w.message.includes("highest-priority pages")));
 });
 
 test("concurrent fetches on one client are paced and robots crawl-delay is respected", async () => {

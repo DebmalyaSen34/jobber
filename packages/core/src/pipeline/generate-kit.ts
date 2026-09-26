@@ -92,6 +92,8 @@ export type PipelineDependencies = {
 };
 
 const defaultDeadlineMs = 12 * 60 * 1_000;
+const defaultCrawlBudgetMs = 60_000;
+const defaultDiscussionBudgetMs = 30_000;
 let configuredProvider: JsonProvider | undefined;
 let configuredGate: ProviderGate | undefined;
 
@@ -108,11 +110,23 @@ function envInteger(env: NodeJS.ProcessEnv, name: string, fallback: number, allo
 function optionsFromEnv(env: NodeJS.ProcessEnv): PipelineOptions {
   return {
     deadlineMs: envInteger(env, "PIPELINE_DEADLINE_MS", defaultDeadlineMs),
-    providerMaxRequests: envInteger(env, "GEMINI_MAX_REQUESTS_PER_CASE", 20),
-    providerMaxTokens: envInteger(env, "GEMINI_MAX_TOKENS_PER_CASE", 30_000),
+    providerMaxRequests: envInteger(env, "GEMINI_MAX_REQUESTS_PER_CASE", 30),
+    providerMaxTokens: envInteger(env, "GEMINI_MAX_TOKENS_PER_CASE", 60_000),
     providerRetries: envInteger(env, "GEMINI_RETRIES", 3, true),
     providerBaseDelayMs: envInteger(env, "GEMINI_RETRY_BASE_MS", 1_000, true),
     providerMaxRetryDelayMs: envInteger(env, "GEMINI_MAX_RETRY_DELAY_MS", 60_000, true),
+    crawl: {
+      maxPages: envInteger(env, "RESEARCH_MAX_PAGES", 15),
+      maxDepth: envInteger(env, "RESEARCH_MAX_DEPTH", 3, true),
+      maxOrigins: envInteger(env, "RESEARCH_MAX_ORIGINS", 4),
+      budgetMs: envInteger(env, "RESEARCH_BUDGET_MS", defaultCrawlBudgetMs),
+      maxRequests: envInteger(env, "RESEARCH_MAX_REQUESTS", 60),
+    },
+    discussions: {
+      retrieval: {
+        budgetMs: envInteger(env, "PUBLIC_DISCUSSION_BUDGET_MS", defaultDiscussionBudgetMs),
+      },
+    },
   };
 }
 
@@ -243,7 +257,7 @@ async function runPipeline(
   await emit(onProgress, "researching");
   const crawlPromise = (dependencies.crawl ?? crawlCompany)(
     input.company_url,
-    { ...options.crawl, budgetMs: Math.min(options.crawl?.budgetMs ?? 45_000, Math.max(1, deadline - now())) },
+    { ...options.crawl, budgetMs: Math.min(options.crawl?.budgetMs ?? defaultCrawlBudgetMs, Math.max(1, deadline - now())) },
     dependencies.crawlDependencies,
   ).catch(() => fallbackCrawl("Company research could not be completed; generation continued from the job description."));
   await emit(onProgress, "extracting");
@@ -257,7 +271,7 @@ async function runPipeline(
       ...options.discussions,
       retrieval: {
         ...options.discussions?.retrieval,
-        budgetMs: Math.min(options.discussions?.retrieval?.budgetMs ?? 20_000, Math.max(1, deadline - now())),
+        budgetMs: Math.min(options.discussions?.retrieval?.budgetMs ?? defaultDiscussionBudgetMs, Math.max(1, deadline - now())),
       },
     },
     dependencies.discussionDependencies,

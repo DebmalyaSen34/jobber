@@ -51,9 +51,9 @@ export async function crawlCompany(input: string, options: CrawlOptions = {}, de
       if (safe.code === "BUDGET_EXHAUSTED") break;
     }
   }
-  if (queue.length) warnings.push({ code: "CRAWL_LIMIT_REACHED", message: "Research stopped at its configured budget; some discovered links were not fetched." });
+  if (queue.length) warnings.push({ code: "CRAWL_LIMIT_REACHED", message: "Research focused on the highest-priority pages; some lower-ranked links were not checked." });
   const hiringPages = pages.filter((page) => page.kind === "hiring").map((page) => page.url);
-  if (!hiringPages.length) warnings.push({ code: "NO_HIRING_PAGE", message: "No hiring-process evidence was discovered within the crawl budget." });
+  if (!hiringPages.length) warnings.push({ code: "NO_HIRING_PAGE", message: "No dedicated hiring-process page was found. The kit uses the job description and other available evidence." });
   if (!pages.some((page) => page.kind === "company")) warnings.push({ code: "NO_COMPANY_BRIEF_PAGE", message: "No clear company/about page was identified; use only available evidence." });
   return { pages, hiring_pages: hiringPages, trace: client.trace, warnings, researched_at: new Date().toISOString() };
 }

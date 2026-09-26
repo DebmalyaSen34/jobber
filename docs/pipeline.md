@@ -46,12 +46,18 @@ Usage is based on provider-reported totals, with a conservative prompt estimate 
 | `GEMINI_TIMEOUT_MS` | `30000` | Timeout for one HTTP attempt |
 | `GEMINI_MIN_INTERVAL_MS` | `4200` | Minimum interval between shared provider request starts; conservative for a 15-RPM tier |
 | `GEMINI_MAX_CONCURRENCY` | `1` | Shared in-process provider concurrency |
-| `GEMINI_MAX_REQUESTS_PER_CASE` | `20` | Attempt budget, including retries |
-| `GEMINI_MAX_TOKENS_PER_CASE` | `30000` | Observed token budget per case |
+| `GEMINI_MAX_REQUESTS_PER_CASE` | `30` | Attempt limit, including retries |
+| `GEMINI_MAX_TOKENS_PER_CASE` | `60000` | Observed model-token safety limit per case |
 | `GEMINI_RETRIES` | `3` | Retries after the initial attempt |
 | `GEMINI_RETRY_BASE_MS` | `1000` | Exponential backoff base |
 | `GEMINI_MAX_RETRY_DELAY_MS` | `60000` | Backoff/`Retry-After` cap |
 | `PIPELINE_DEADLINE_MS` | `720000` | Provider deadline for one case |
+| `RESEARCH_MAX_PAGES` | `15` | Maximum company pages considered |
+| `RESEARCH_MAX_DEPTH` | `3` | Maximum discovered-link depth |
+| `RESEARCH_MAX_ORIGINS` | `4` | Maximum related origins followed |
+| `RESEARCH_BUDGET_MS` | `60000` | Company-research wall-clock limit |
+| `RESEARCH_MAX_REQUESTS` | `60` | Company-research HTTP attempt limit, including robots and retries |
+| `PUBLIC_DISCUSSION_BUDGET_MS` | `30000` | Public-discussion search wall-clock limit |
 
 `GEMINI_API_BASE_URL` is a trusted test/proxy override and must not be derived from user input.
 

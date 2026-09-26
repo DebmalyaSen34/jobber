@@ -58,12 +58,19 @@ test("reliable provider does not retry permanent failures and enforces request, 
   const callerRequest = { stage: "extract", system: "s", prompt: "p", schema: {}, maxOutputTokens: 5_000 };
   await one.generateJson(callerRequest);
   assert.equal(callerRequest.maxOutputTokens, 5_000);
-  await assert.rejects(() => one.generateJson({ stage: "extract", system: "s", prompt: "p", schema: {} }), /request budget/i);
+  await assert.rejects(() => one.generateJson({ stage: "extract", system: "s", prompt: "p", schema: {} }), /generation limit/i);
 
   const tokens = new ReliableJsonProvider({ async generateJson() { return success({ ok: true }); } }, {
     deadline: Date.now() + 1_000, maxTokens: 65, gate: new ProviderGate({ minIntervalMs: 0 }),
   });
-  await assert.rejects(() => tokens.generateJson({ stage: "extract", system: "long system", prompt: "long prompt", schema: {} }), /token budget/i);
+  await assert.rejects(() => tokens.generateJson({ stage: "extract", system: "long system", prompt: "long prompt", schema: {} }), /generation limit/i);
+
+  const generous = new ReliableJsonProvider({ async generateJson() {
+    return { ...success({ ok: true }), usage: { inputTokens: 10_000, outputTokens: 10_000, totalTokens: 20_000 } };
+  } }, { deadline: Date.now() + 1_000, gate: new ProviderGate({ minIntervalMs: 0 }) });
+  await generous.generateJson({ stage: "extract", system: "s", prompt: "p", schema: {} });
+  await generous.generateJson({ stage: "extract", system: "s", prompt: "p", schema: {} });
+  assert.equal(generous.snapshot.tokens, 40_000);
 
   const deadline = new ReliableJsonProvider({ async generateJson() { return new Promise(() => {}); } }, {
     deadline: Date.now() + 10, gate: new ProviderGate({ minIntervalMs: 0 }),
