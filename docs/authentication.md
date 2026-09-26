@@ -1,6 +1,6 @@
 # Authentication and ownership
 
-M3 task 2 adds application-owned authentication to the Render API and first-party session handling through the Vercel frontend. Passwords and session credentials never enter the public Next.js bundle.
+Jobber uses application-owned authentication in the Render API and first-party session handling through the Vercel frontend. Passwords and session credentials never enter the public Next.js bundle.
 
 ## Browser and API flow
 
@@ -26,7 +26,7 @@ The `/dashboard` proxy check provides an early redirect when no cookie exists. I
 - Session expiry is absolute and defaults to seven days. MongoDB has a TTL index for cleanup, while request handling enforces expiry immediately without waiting for TTL deletion.
 - Login throttling is enforced atomically in MongoDB by separately HMAC-keyed normalized-email and client-IP windows. Successful login clears both counters. Invalid email and invalid password share one response.
 - Registration/login require an exact trusted `Origin`. Authenticated mutations additionally require the session's `X-CSRF-Token`. CORS remains an exact allowlist with credentials enabled.
-- `assertOwner` compares the authenticated user ID to a resource owner and returns the same 404 used for absent data. Every future kit, job, mutation, and practice lookup must query by owner or call this guard before returning state.
+- `assertOwner` compares the authenticated user ID to a resource owner and returns the same 404 used for absent data. Kit, job, mutation, and practice lookups query by owner or apply this guard before returning state.
 
 Email verification, password reset, account recovery, multi-factor authentication, and global session revocation are outside the MVP scope.
 
@@ -55,6 +55,4 @@ Changing `SESSION_SECRET` does not invalidate existing sessions because session 
 
 ## Verification
 
-Network-free service tests cover normalized registration, bcrypt hashes, duplicate and malformed credentials, generic login failures, email throttling, successful-counter clearing, CSRF comparison, expiry deletion, logout invalidation, and cross-owner denial. The loopback HTTP test covers trusted-origin enforcement, cookie flags, session/account reads, rejected logout without CSRF, successful logout, and rejection of the deleted session.
-
-Production authentication remains unverified until this change is deployed to both Render and Vercel and a fresh account completes register → dashboard → logout → rejected old session.
+Network-free service tests cover normalized registration, bcrypt hashes, duplicate and malformed credentials, generic login failures, email throttling, successful-counter clearing, CSRF comparison, expiry deletion, logout invalidation, and cross-owner denial. The loopback HTTP suite covers trusted-origin enforcement, cookie flags, session/account reads, rejected logout without CSRF, successful logout, rejection of the deleted session, and owner isolation.

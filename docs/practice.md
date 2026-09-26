@@ -1,6 +1,6 @@
 # Flashcard practice
 
-M4 task 4 adds durable, owner-scoped flashcard practice to completed kits. M4 task 5 verifies its keyboard, mobile, and reopen behavior.
+Completed kits include durable, owner-scoped flashcard practice with deterministic next-session ordering.
 
 ## Session behavior
 
@@ -27,4 +27,4 @@ Each review records a hash of the material card content. If the front, back, or 
 - The loopback HTTP suite verifies authenticated progress reads, CSRF rejection, successful review persistence, counts, and cross-owner 404.
 - Lint, all type checks, the repository test suite, and the webpack production frontend build pass.
 - Keyboard browser QA skipped the first card without creating a review, revealed the second card, confirmed focus moved to `Again`, and recorded `Unsure` with Enter-key activation. Reopening retained one unseen and one reviewed card; the following session presented the unseen card first.
-- The same real-Chrome 375×812 and 812×375 checks used for the editor found no page-level horizontal overflow, preserved 44px minimum main action targets, and produced no runtime console errors or framework error overlay.
+- Real-Chrome checks at 375×812 and 812×375 found no page-level horizontal overflow, preserved 44px minimum main action targets, and produced no runtime console errors or framework error overlay.

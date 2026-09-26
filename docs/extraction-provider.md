@@ -1,10 +1,10 @@
 # Evidence-based extraction and provider adapter
 
-M2 task 3 adds a provider-neutral structured JSON boundary and a JD-only extractor. Import server-side APIs from `@jobber/core/generation` and `@jobber/core/extraction`.
+The server-side generation package provides a provider-neutral structured JSON boundary and a JD-only extractor. Import APIs from `@jobber/core/generation` and `@jobber/core/extraction`.
 
 ## Provider configuration
 
-The initial adapter uses the [Gemini Developer API](https://ai.google.dev/api/generate-content) directly over `fetch`, so there is no provider SDK dependency. The default model is the stable `gemini-3.5-flash-lite`, which Google recommends for new projects and documents as supporting structured outputs. Model availability and quotas are external and can change; override the model with `GEMINI_MODEL` after a live quality/throughput check.
+The adapter uses the [Gemini Developer API](https://ai.google.dev/api/generate-content) directly over `fetch`, so there is no provider SDK dependency. The default model is `gemini-3.5-flash-lite` with structured output enabled. Model availability and quotas are external; `GEMINI_MODEL` provides a server-side override.
 
 Copy `.env.example` and set:
 
@@ -35,4 +35,4 @@ Requirement IDs are assigned by application code from the quote and offset, maki
 
 Network-free tests cover all six reviewed JD fixtures, stable IDs, exact offsets, alternatives, qualifiers, nice/must distinctions, thin inputs, prompt-injection handling, malformed/ungrounded output, structured Gemini request shape, usage metadata, safe error mapping, `Retry-After`, blocked output, timeout, and invalid configuration.
 
-Live extraction verification ran on 2026-09-24 with `gemini-3.5-flash-lite` and the synthetic backend/thin fixtures. The first backend run exposed a real semantic gap: mentoring under “Required qualifications” was returned only as a responsibility. After making the heading rule explicit, the rerun returned all four reviewed requirements with correct kinds/priorities and exact source evidence; wording differed only by terminal punctuation. It did not promote React/AWS company context into requirements. The thin fixture returned zero requirements, unknown seniority/location, and the expected limitation warning. Final calls took about 1.75 seconds and 1.24 seconds respectively. This is a two-case extraction check, not the required category sample or five-case end-to-end benchmark.
+Live extraction verification ran on 2026-09-24 with `gemini-3.5-flash-lite` and the synthetic backend/thin fixtures. The backend fixture returned all four reviewed requirements with correct kinds, priorities, and exact source evidence; wording differed only by terminal punctuation. It did not promote React/AWS company context into requirements. The thin fixture returned zero requirements, unknown seniority and location, and the expected limitation warning. Calls took about 1.75 seconds and 1.24 seconds. Full-pipeline throughput and coverage results are recorded in [live-benchmark.md](live-benchmark.md).

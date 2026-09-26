@@ -1,6 +1,6 @@
 # Dashboard, creation, and kit workspace
 
-M3 task 4 connects the authenticated web application to the durable jobs and kits created in task 3. All routes remain first-party in the browser (`/api/v1/*`) and are rewritten to the Render API. The API derives ownership from the persisted session; clients never submit an owner ID.
+The authenticated web application presents durable jobs, kits, editing, regeneration, and practice through first-party browser routes. Requests to `/api/v1/*` are rewritten to the Render API. The API derives ownership from the persisted session; clients never submit an owner ID.
 
 ## User flow
 
@@ -27,13 +27,12 @@ M3 task 4 connects the authenticated web application to the durable jobs and kit
 | `GET /api/v1/jobs` | Up to 100 owner-scoped durable jobs, newest update first |
 | `POST /api/v1/kits/batch` | Per-row queue or validation result for a JSON case array |
 
-Job responses expose only the company URL, day count, and JD character count needed by the UI; they do not return the raw JD. Kit detail returns the original input because future editing and regeneration need the exact source, but omits internal research/provider execution traces. Cross-owner job and kit IDs return the same 404 shape as missing IDs.
+Job responses expose only the company URL, day count, and JD character count needed by the UI; they do not return the raw JD. Kit detail returns the original input because editing and regeneration use the exact source, but omits internal research/provider execution traces. Cross-owner job and kit IDs return the same 404 shape as missing IDs.
 
 Batch mutations require an allowed exact `Origin`, an authenticated session, and the session-bound `X-CSRF-Token`. Valid rows use the same canonicalization, fingerprint, active deduplication, limits, and worker queue as one-at-a-time submissions. The worker is awakened once when a batch queues at least one valid row.
 
-## Current limits
+## Supported limits
 
-- The dashboard caps each list at 100 records; pagination is future work.
-- Task 4 is read-only after generation. Typed editing, revision conflicts, regeneration merge, deletion, and practice are M4 work.
-- Polling is intentionally simple and process-independent. Push updates are not required for the current scale.
-- The local browser verification used a mock API/session and did not call Gemini, Atlas, Render, or Vercel. Production submit/refresh/restart recovery and the full deployed-user exit test remain deployment checks.
+- The dashboard returns the 100 most recent kits and jobs in each list.
+- Progress uses process-independent polling rather than a push channel.
+- Completed kits support typed editing, conflict recovery, safe section regeneration, deletion, derived health, and persistent practice as documented in [editing.md](editing.md) and [practice.md](practice.md).

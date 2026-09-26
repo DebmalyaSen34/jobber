@@ -1,6 +1,6 @@
 # Category generation, coverage repair, and flashcards
 
-M2 task 4 implements provider-backed preparation content without giving the model control over routing, IDs, coverage decisions, or scheduling. Import these server-side APIs from `@jobber/core/generation`:
+Provider-backed preparation content is generated without giving the model control over routing, IDs, coverage decisions, or scheduling. Import these server-side APIs from `@jobber/core/generation`:
 
 - `routeRequirements(requirements, context)`
 - `generateQuestionsWithCoverage(requirements, provider, options)`
@@ -45,4 +45,4 @@ Network-free tests demonstrate:
 - thin-input call avoidance;
 - flashcard validation, deduplication, IDs, and traces.
 
-Live `gemini-3.5-flash-lite` verification on 2026-09-24 used the approved synthetic backend requirements. Technical, behavioural, and system-design calls generated five questions and covered all four requirements on the first computed pass; a separate flashcard call produced four grounded cards. The full run took 7.66 seconds and reported 2,065 total tokens. A first sample exposed an overclaim about compile-time types preventing runtime errors, so the shared prompt now explicitly distinguishes compile-time and runtime behavior and rejects absolute guarantees. A question-only rerun took 6.17 seconds, retained complete coverage, and produced technically stronger outlines. The later five-case benchmark exercised company-fit, assembled orchestration, shared pacing, and a live repair pass; see `docs/live-benchmark.md`.
+Live `gemini-3.5-flash-lite` verification on 2026-09-24 used the approved synthetic backend requirements. Technical, behavioural, and system-design calls generated five questions and covered all four requirements on the first computed pass; a separate flashcard call produced four grounded cards. The full questions-and-cards run took 7.66 seconds and reported 2,065 total tokens. The shared prompt distinguishes compile-time and runtime behavior and rejects absolute guarantees; a focused question verification took 6.17 seconds, retained complete coverage, and produced technically accurate outlines. The five-case benchmark also exercised company-fit, assembled orchestration, shared pacing, and a live repair pass; see [live-benchmark.md](live-benchmark.md).

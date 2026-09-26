@@ -1,6 +1,6 @@
 # End-to-end generation pipeline
 
-M2 task 5 connects the independently tested research, extraction, generation, coverage, flashcard, scheduling, and validation stages behind one shared implementation.
+One shared implementation connects research, extraction, generation, coverage repair, flashcards, scheduling, and final validation for both the web application and evaluation CLI.
 
 ## Entry points
 
@@ -45,7 +45,7 @@ Usage is based on provider-reported totals, with a conservative prompt estimate 
 | `GEMINI_MODEL` | `gemini-3.5-flash-lite` | Structured-output model |
 | `GEMINI_TIMEOUT_MS` | `30000` | Timeout for one HTTP attempt |
 | `GEMINI_MIN_INTERVAL_MS` | `4200` | Minimum interval between shared provider request starts; conservative for a 15-RPM tier |
-| `GEMINI_MAX_CONCURRENCY` | `1` | Shared in-process provider concurrency |
+| `GEMINI_MAX_CONCURRENCY` | `1` | Process-wide provider concurrency |
 | `GEMINI_MAX_REQUESTS_PER_CASE` | `30` | Attempt limit, including retries |
 | `GEMINI_MAX_TOKENS_PER_CASE` | `60000` | Observed model-token safety limit per case |
 | `GEMINI_RETRIES` | `3` | Retries after the initial attempt |
@@ -65,4 +65,4 @@ Usage is based on provider-reported totals, with a conservative prompt estimate 
 
 Successful kits include concise generation traces and provider-call accounting: stage, attempt count, retry codes, model/provider identity, and token counts. Prompts, JD/source text, credentials, provider response bodies, and hidden reasoning are not retained.
 
-Network-free verification on 2026-09-24 covered transient and permanent failures, `Retry-After`, schema-feedback repair, request/token/deadline exhaustion, a fully researched five-day kit, a 60-day thin kit with failed research, schedule construction, source accounting, progress events, and final validation. `npm run check` passed 75 tests with clean lint and type checks. The final real CLI benchmark produced five valid kits in 122.22 seconds using 26 requests and 17,477 tokens with no retries; see `docs/live-benchmark.md` for findings and limitations.
+Network-free verification covers transient and permanent failures, `Retry-After`, schema-feedback repair, request/token/deadline exhaustion, a fully researched five-day kit, a 60-day thin kit with failed research, schedule construction, source accounting, progress events, and final validation. The real CLI benchmark produced five valid kits in 122.22 seconds using 26 requests, 17,477 tokens, and no retries; see [live-benchmark.md](live-benchmark.md) for findings and limitations.

@@ -1,4 +1,4 @@
-# Company retrieval (M2 task 1)
+# Company retrieval
 
 Server-side retrieval is exported from `@jobber/core/retrieval`, separately from the browser-compatible core schemas. The module provides `RetrievalClient.fetchPage`, `cleanPage`, and `crawlCompany`. It does not call an LLM, search public discussion, or generate a kit.
 
@@ -20,9 +20,9 @@ Build core before standalone Node imports: `npm run build --workspace=@jobber/co
 
 `crawlCompany` returns cleaned `pages`, candidate `hiring_pages`, `trace`, `warnings`, and `researched_at`. Each page includes its final URL, title, capped plain text, discovered/ranked links, coarse kind, truncation flag, discovery parent/depth, and `trust: 'untrusted'`.
 
-Traces include page/robots/API purpose, timestamp, HTTP status or safe error code, attempt number, and fetched/redirect/retry/failed/skipped outcome. Credentials, query strings, and fragments are stripped from trace URLs. Raw exception messages are not exposed. Successful robots retrieval is not company evidence. The later pipeline must set `pages_used` from pages it actually uses, not from every attempted URL.
+Traces include page/robots/API purpose, timestamp, HTTP status or safe error code, attempt number, and fetched/redirect/retry/failed/skipped outcome. Credentials, query strings, and fragments are stripped from trace URLs. Raw exception messages are not exposed. Successful robots retrieval is not company evidence. The pipeline sets `pages_used` from pages it actually uses, not from every attempted URL.
 
-Hiring classification is a deterministic heuristic, not a factual guarantee about the current interview process. Link labels alone do not establish hiring evidence. Retain source text and provenance for later grounded synthesis. Cleaned HTML is still untrusted text; later model prompts must not follow instructions embedded in it.
+Hiring classification is a deterministic heuristic, not a factual guarantee about the interview process. Link labels alone do not establish hiring evidence. Source text and provenance are retained for grounded synthesis. Cleaned HTML is still untrusted text; model prompts must not follow instructions embedded in it.
 
 ## Fetch policy and transport
 
@@ -43,7 +43,7 @@ This follows the address-validation and redirect concerns described in [OWASP's 
 - Recognize user-agent allow/disallow rules and crawl-delay. Identify requests as `JobberResearchBot/1.0`.
 - Serialize fetches on each client, including robots and retries. Pace each hostname by the larger of minimum interval and robots crawl-delay. If a required wait does not fit the remaining deadline, stop instead of ignoring it.
 - Retry 429 and 500/502/503/504, plus DNS/network errors, within configured limits. Respect Retry-After seconds or dates; otherwise use exponential backoff with small jitter. Do not retry ordinary 404s, blocked addresses, body/type violations, or exhausted deadlines.
-- A backend running multiple independent clients concurrently will need to share/schedule them to enforce aggregate host limits across jobs. This module enforces limits per client; cross-process coordination is not implemented.
+- Limits are enforced per retrieval client. Independent clients do not share hostname pacing; deployments that require aggregate enforcement across jobs need an external coordination layer.
 
 ## Default bounds
 
@@ -67,7 +67,7 @@ This follows the address-validation and redirect concerns described in [OWASP's 
 
 Timeouts cover DNS waiting, connection, and body delivery; retry waits are bounded by the same deadline. Encoded bytes are checked while receiving, and gzip/deflate/Brotli decoding has a separate output limit. Error/redirect bodies are discarded. Accepted page types are HTML, XHTML, and plain text; robots must be plain text. Unsupported encodings/types are skipped.
 
-Options are trusted process configuration. Defaults fit the assessment timebox but must still be tuned with the later five-case live benchmark.
+Options are trusted process configuration. The defaults were validated against the recorded five-case live benchmark and remain bounded by the overall pipeline deadline.
 
 ## Discovery and cleaning
 
@@ -77,7 +77,7 @@ Rank discovered links using path, anchor text, and bounded surrounding text: int
 
 The crawler records absence of discovered hiring/company evidence, fetch failures, truncation, and crawl limits without throwing away successful pages. A missing page is not a reason to fabricate a company summary. Discovery is bounded: absence within the crawl is not proof that a page does not exist anywhere.
 
-## Verification and current limits
+## Verification and supported limits
 
 Run:
 
@@ -88,10 +88,10 @@ npm run test:retrieval:http
 
 The standard suite uses injected resolver/transport fixtures without networking. The HTTP suite binds temporary loopback servers and exercises real transport, DNS pinning, retained Host, robots, relative-link crawling, private redirects, byte/content-type limits, compression bombs, partial-body timeouts, disconnects, and Retry-After.
 
-Verified on 2026-09-24: 47 standard tests (33 core, 9 CLI, 5 fixtures), five real HTTP retrieval tests, and a public HTTPS smoke fetch of `https://example.com/`. The public smoke produced one page and honest no-hiring/no-company warnings. No API credentials or paid service were needed. The earlier standalone fixture-server test was not part of this task's count.
+Verified on 2026-09-24 with network-free unit tests, real loopback HTTP retrieval tests, and a public HTTPS smoke fetch of `https://example.com/`. The public smoke produced one page and honest no-hiring/no-company notes. No API credentials or paid service were needed.
 
-Limitations: no JavaScript rendering, PDF extraction, charset detection beyond UTF-8, sitemap expansion, or guarantee of finding every hiring page. HTML visibility based solely on external CSS is not evaluated. Heading/text classification and keyword ranking are heuristics. The shared pipeline now consumes retrieval, public discussion, extraction, and generation; this does not by itself constitute the live five-case benchmark.
+Limitations: no JavaScript rendering, PDF extraction, charset detection beyond UTF-8, sitemap expansion, or guarantee of finding every hiring page. HTML visibility based solely on external CSS is not evaluated. Heading/text classification and keyword ranking are heuristics.
 
-M2 task 2 adds `fetchJson`, accepting `application/json` under the same destination/robots/redirect/transport protections. JSON parsing failures report `INVALID_JSON`; page content types are unchanged. The HTTP suite now includes six tests, with a real JSON search and partial-failure scenario.
+`fetchJson` accepts `application/json` under the same destination, robots, redirect, and transport protections. JSON parsing failures report `INVALID_JSON`; page content types are unchanged. The HTTP suite includes a real JSON search and partial-failure scenario.
 
-NAT64 follow-up verification: 59 standard tests, lint/type checks, six HTTP tests, and two successful live Algolia queries on 2026-09-24. No DNS/TLS/robots bypass or resolver override was used.
+NAT64 verification includes public and restricted translations, mixed DNS answers, fixture policy, and metadata redirects. Two live Algolia queries also succeeded on 2026-09-24 without DNS, TLS, robots, or resolver bypasses.

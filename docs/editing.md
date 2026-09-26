@@ -1,6 +1,6 @@
 # Kit editing
 
-M4 tasks 1–3 add durable, owner-scoped editing, safe section regeneration, and explicit derived-state repair to completed kits. M4 task 5 verifies the complete editor interaction and recovery path.
+Completed kits support durable, owner-scoped editing, safe section regeneration, and explicit derived-state repair.
 
 ## Interaction model
 
@@ -51,5 +51,5 @@ Regeneration controls require the initial local draft to be saved, but editing r
 - The API suites verify authoritative stale-reference removal, coverage and schedule-health recomputation, reconciliation counts, an authenticated successful edit, revision increment, stale-save conflict, and cross-owner 404.
 - The webpack production frontend build passes.
 - A local browser smoke with a temporary mock session verified view/edit states, accessible labels and controls, local dirty state, successful save feedback/revision increment, and question addition without a framework error overlay.
-- The M4 task 5 keyboard acceptance run opened editing and saved through Enter-key activation. A forced 503 kept the local draft and exposed retry feedback; a forced stale-revision response kept the draft, offered an explicit discard/load-latest action, loaded the remote revision, and then saved revision 3 successfully.
+- Keyboard acceptance opened editing and saved through Enter-key activation. A forced 503 kept the local draft and displayed retry feedback; a forced stale-revision response kept the draft, offered an explicit discard/load-latest action, loaded the remote revision, and then saved revision 3 successfully.
 - Real Chrome device emulation at 375×812 and 812×375 found no page-level horizontal overflow, kept visible main buttons at least 44px high, and rendered the authenticated workspace without a framework error overlay.

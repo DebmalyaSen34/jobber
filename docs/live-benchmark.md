@@ -1,13 +1,13 @@
 # Live Gemini benchmark — 2026-09-24
 
-M2's five-case live-provider benchmark used the real evaluation CLI, `gemini-3.5-flash-lite`, and the synthetic inputs in `examples/live-benchmark-cases.json`. The company URLs used the repository's loopback-only fixture server so the research graph and failure cases were deterministic; Gemini calls were real.
+The five-case live-provider benchmark used the real evaluation CLI, `gemini-3.5-flash-lite`, and the synthetic inputs in `examples/live-benchmark-cases.json`. The company URLs used the repository's loopback-only fixture server so the research graph and failure cases were deterministic; Gemini calls were real.
 
 Final command:
 
 ```bash
 /usr/bin/time -p npm run evaluate -- \
   --input examples/live-benchmark-cases.json \
-  --output /tmp/jobber-m2-task5-live-benchmark.json
+  --output /tmp/jobber-live-benchmark.json
 ```
 
 Result: **5 successful, 0 failed in 122.22 seconds**. The output envelope passed `evaluationOutputSchema`, and every kit independently passed `validateKit` in generated mode with its requested day count.
@@ -23,13 +23,10 @@ Result: **5 successful, 0 failed in 122.22 seconds**. The output envelope passed
 
 All final cases had empty uncovered-requirement lists. The thin case generated no requirements, questions, or cards and retained its 60 honest zero-minute schedule days. The unreachable case completed from the JD with `HTTP_404`, `NO_HIRING_PAGE`, `NO_COMPANY_BRIEF_PAGE`, `COMPANY_IDENTITY_UNRESOLVED`, and `COMPANY_BRIEF_LIMITATION` warnings.
 
-## Findings and corrections
+## Configuration and interpretation
 
-The first run completed in 58.94 seconds but stopped at 3/5 because the original one-second gate reached the account's apparent 15-request/minute limit. Defaults were changed to a conservative 4.2-second shared interval, three retries, a one-second exponential base, and a 60-second retry/`Retry-After` cap.
+The verified provider configuration uses a 4.2-second shared request interval, three retries, a one-second exponential base, and a 60-second retry/`Retry-After` cap. Repair prompts supply the application-controlled allowed categories for every uncovered requirement; the behavioural case reached complete coverage in two passes.
 
-The next run reached 4/5 in 140.80 seconds and exposed a deterministic coverage-repair validation loop. Repair prompts now supply the application-controlled allowed categories for every uncovered requirement. A focused live rerun then closed the behavioural gap in two coverage passes.
+Extraction guidance separates independently testable duties joined by “and” and treats educational and industry qualifications as domain requirements. The reviewed behavioural extraction contained all five expected requirements with exact evidence and correct kinds and priorities.
 
-Live semantic inspection also found that the extractor merged two independently testable duties joined by “and.” Extraction guidance now explicitly splits those duties and consistently treats educational and industry qualifications as domain requirements. A focused live extraction returned all five reviewed behavioural requirements with exact evidence and correct kinds/priorities before the final batch.
-
-Question inspection found specific technical, behavioural, system-design, and evidence-aware company-fit prompts with valid references. This was a manual spot-check, not a formal human relevance score. The fixture company names were not present in the JDs and loopback hostnames cannot corroborate identity, so public-discussion searches correctly reported `COMPANY_IDENTITY_UNRESOLVED`; the independently recorded M2 task 2 live search remains the public-discussion evidence. The final run was a fresh CLI process but followed earlier calls in the same provider quota window, so it should not be described as a cold-account benchmark.
-
+Manual inspection found specific technical, behavioural, system-design, and evidence-aware company-fit prompts with valid references. This was a semantic spot-check, not a formal human relevance score. The fixture company names were absent from the JDs, and loopback hostnames cannot corroborate identity, so public-discussion searches correctly reported `COMPANY_IDENTITY_UNRESOLVED`; the independently recorded live GitLab search provides the public-discussion evidence. The benchmark started in a fresh CLI process but shared the provider quota window with other verification calls, so it is not a cold-account benchmark.

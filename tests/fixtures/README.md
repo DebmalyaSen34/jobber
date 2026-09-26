@@ -27,15 +27,15 @@ npm run test:fixtures:http
 | unreachable | Stated SQL requirement preserved despite company 404 |
 | injection | Embedded instruction treated as untrusted data; only TypeScript extracted |
 
-Expected requirements contain stable fixture IDs and exact quote/offset evidence. They are review baselines; future extractor tests should compare meaning, priorities, and qualifiers, not demand identical generated IDs or wording. The degree/equivalent requirement uses `domain` as the closest of the allowed kinds; reassess this choice with the extraction policy. These ASCII fixtures do not establish a Unicode offset policy.
+Expected requirements contain stable fixture IDs and exact quote/offset evidence. They are review baselines; extractor tests compare meaning, priorities, and qualifiers rather than demanding identical generated IDs or wording. The degree/equivalent requirement uses `domain` as the closest allowed kind. These ASCII fixtures do not establish a Unicode offset policy.
 
 ## Provider responses
 
-`coverage-repair.json` intentionally omits the backend JD's mentoring requirement in its first response; the repair response covers it. Fixture tests combine those canned responses and verify coverage plus a valid allocated kit. They do **not** execute a real generation/repair loop. M2 must inject the responses into its actual orchestration and assert targeted calls and pass counts.
+`coverage-repair.json` intentionally omits the backend JD's mentoring requirement in its first response; the repair response covers it. The generation test injects those responses into the production orchestration and verifies the targeted call, computed pass count, closed gap, and valid allocated kit.
 
 `scenarios.json` contains provider-neutral transport response descriptors: status, raw body, optional headers, and optional delay. Scenarios cover 429 then success, malformed JSON then success, incomplete kit, temporary failure, permanent auth error, timeout, empty public discussion, and failed public discussion.
 
-`scriptedProvider(name)` returns an isolated, ordered `next(request)` test double with request history. Exhaustion throws instead of silently repeating a success. It returns delay metadata immediately; the future adapter test harness is responsible for advancing a fake clock or simulating the timeout. No retries or parsing are implemented by the double.
+`scriptedProvider(name)` returns an isolated, ordered `next(request)` test double with request history. Exhaustion throws instead of silently repeating a success. It returns delay metadata immediately so adapter tests can advance a fake clock or simulate a timeout. The double does not implement retries or parsing.
 
 ## Company sites
 
@@ -43,7 +43,7 @@ Expected requirements contain stable fixture IDs and exact quote/offset evidence
 
 - `/acme/` links to `/acme/people/`, which links relatively to `/handbook/working-together/selection/`. This page describes a take-home API exercise, system-design interview, and mentoring discussion. A list of guessed careers paths will not find it.
 - `/no-hiring/` and its product page form a closed link graph with no hiring page.
-- `/robots.txt` disallows `/blocked/`; the blocked endpoint is available so future tests can assert that the crawler did not request it. The server does not enforce robots for the crawler.
+- `/robots.txt` disallows `/blocked/`; tests assert that the crawler does not request the available blocked endpoint. The server does not enforce robots for the crawler.
 - `/hostile/` includes malicious instructions and script content to exercise cleaning and prompt trust boundaries.
 - `/failures/` provides missing, slow, redirect, redirect-loop, private-redirect, wrong-content-type, oversized (2 MiB), and rate-limited-then-recovered responses.
 
@@ -51,10 +51,6 @@ Expected requirements contain stable fixture IDs and exact quote/offset evidence
 
 The private redirect is deliberately a dangerous destination string. Neither helper follows it. Only test it through a secure fetcher or with `redirect: 'manual'`; never fetch the metadata address. Local fixtures do not authorize weakening production SSRF protection.
 
-## Remaining M2 integration
+## Coverage
 
-- Feed raw JDs through the real extractor and compare with reviewed annotations.
-- Completed in M2 task 1: the real retrieval client/crawler is exercised against these sites using a trusted loopback-origin policy. Run `npm run test:retrieval:http`; see `docs/retrieval.md` for verification and limitations.
-- Feed scripted provider responses through the actual adapter/orchestrator; verify retries, bounded repair, category-specific calls, and gap closure.
-- Test actual connection failures with an injected transport rather than relying on an arbitrary unused port.
-- Run separate live-provider quality and timing benchmarks; fixture speed proves neither.
+The test suites use these fixtures for reviewed extraction, trusted-loopback retrieval, real HTTP transport, connection failures, category-specific calls, retry behavior, bounded coverage repair, and gap closure. Live-provider quality and timing evidence is recorded separately in `docs/live-benchmark.md`; fixture speed is not treated as provider-performance evidence.

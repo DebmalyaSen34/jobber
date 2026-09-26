@@ -1,6 +1,6 @@
 # Persisted generation jobs
 
-M3 task 3 runs generation asynchronously from the HTTP request while keeping MongoDB as the durable queue and source of truth. This follows the PRD decision to begin with an execution loop inside the Render API process instead of adding a separate broker or paid worker service.
+Generation runs asynchronously from the HTTP request while MongoDB remains the durable queue and source of truth. The execution loop runs inside the Render API process and does not require a separate broker.
 
 ## Request flow
 
@@ -21,7 +21,7 @@ The public job response contains IDs, status/stage, the bounded progress history
 
 ## Duplicate policy
 
-The fingerprint covers normalized JD text, canonical company URL, requested days, and `PIPELINE_VERSION`. MongoDB's sparse unique `active_key` index includes the owner, so equivalent active submissions for one owner reuse the same job while different users remain independent. Terminal jobs release the active key; completed-copy UX belongs to the dashboard task.
+The fingerprint covers normalized JD text, canonical company URL, requested days, and `PIPELINE_VERSION`. MongoDB's sparse unique `active_key` index includes the owner, so equivalent active submissions for one owner reuse the same job while different users remain independent. Terminal jobs release the active key.
 
 ## Leases and recovery
 
@@ -40,7 +40,7 @@ Transient provider failures discovered through the core error cause enter `retry
 - `generation_jobs.active_key`: sparse unique active-job deduplication.
 - `generation_jobs.status/next_attempt_at/lease_expires_at/created_at`: ordered atomic claims.
 - `generation_jobs.owner_id/created_at`: owner progress history.
-- `kits.owner_id/updated_at`: future dashboard/workspace listing.
+- `kits.owner_id/updated_at`: dashboard/workspace listing.
 
 ## Configuration
 
@@ -52,7 +52,7 @@ Transient provider failures discovered through the core error cause enter `retry
 | `JOB_RETRY_BASE_MS` | `5000` | Exponential automatic retry base delay |
 | `PIPELINE_VERSION` | `1` | Deduplication boundary for generation semantics |
 
-The current Render free-service topology executes jobs in the web process. A future dedicated worker can use the same MongoDB claim protocol without changing the API or adding Redis. Because the free web service can idle when there is no inbound traffic, production verification must include submitting a job, refreshing during execution, and forcing a restart while it is leased.
+The Render free-service topology executes jobs in the web process. Because the service can idle or restart, the lease protocol and startup repair path are part of normal operation rather than relying on process memory.
 
 ## Verification
 
